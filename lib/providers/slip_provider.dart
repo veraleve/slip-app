@@ -10,6 +10,7 @@ class SlipProvider extends ChangeNotifier {
   List<Slip> _slips = [];
   List<TaskItem> _tasks = [];
   bool _isLoading = false;
+  bool _isLoadingMore = false;
   int _activeTabIndex = 0;
   String _selectedExamFilter = 'All';
   String _selectedTopicFilter = 'All';
@@ -46,6 +47,7 @@ class SlipProvider extends ChangeNotifier {
   List<TaskItem> get tasks => List.unmodifiable(_tasks);
 
   bool get isLoading => _isLoading;
+  bool get isLoadingMore => _isLoadingMore;
   int get activeTabIndex => _activeTabIndex;
   String get selectedExamFilter => _selectedExamFilter;
   String get selectedTopicFilter => _selectedTopicFilter;
@@ -105,6 +107,26 @@ class SlipProvider extends ChangeNotifier {
     final allowedPapers = _selectedExamFilter == 'All' ? null : [_selectedExamFilter];
     _slips = await _service.fetchStream(userPapers: allowedPapers);
     _isLoading = false;
+    notifyListeners();
+  }
+
+  Future<void> loadMoreSlips() async {
+    if (_isLoadingMore || _slips.isEmpty) return;
+    _isLoadingMore = true;
+    notifyListeners();
+    try {
+      final oldestTimestamp = _slips.last.createdAt;
+      final olderSlips = await _service.fetchOlderSlips(beforeTimestamp: oldestTimestamp);
+      if (olderSlips.isNotEmpty) {
+        final existingIds = _slips.map((s) => s.id).toSet();
+        for (final slip in olderSlips) {
+          if (!existingIds.contains(slip.id)) {
+            _slips.add(slip);
+          }
+        }
+      }
+    } catch (_) {}
+    _isLoadingMore = false;
     notifyListeners();
   }
 

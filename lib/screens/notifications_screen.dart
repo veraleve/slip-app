@@ -8,12 +8,12 @@ import '../theme/slip_theme.dart';
 
 class NotificationsScreen extends StatefulWidget {
   final SlipProvider? provider;
-  final VoidCallback onOpenReviewCycle;
+  final VoidCallback? onOpenReviewCycle;
 
   const NotificationsScreen({
     super.key,
     this.provider,
-    required this.onOpenReviewCycle,
+    this.onOpenReviewCycle,
   });
 
   @override
@@ -169,7 +169,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   return InkWell(
                     onTap: () {
                       if (alert['type'] == 'cycle') {
-                        widget.onOpenReviewCycle();
+                        widget.onOpenReviewCycle?.call();
                       }
                     },
                     borderRadius: BorderRadius.circular(14),

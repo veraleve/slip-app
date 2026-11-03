@@ -29,7 +29,6 @@ class SlipCard extends StatefulWidget {
     required this.onPassTap,
     this.provider,
   });
-  });
 
   @override
   State<SlipCard> createState() => _SlipCardState();
@@ -500,11 +499,6 @@ class _SlipCardState extends State<SlipCard> {
               ),
             ],
           ),
-
-          // 7. Toggleable Inline Comments / Answers Sheet
-          if (_showComments) ...[
-            CommentThreadSheet(slipId: slip.id),
-          ],
         ],
       ),
     );

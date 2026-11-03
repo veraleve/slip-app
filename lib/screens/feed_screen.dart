@@ -155,7 +155,18 @@ class _FeedScreenState extends State<FeedScreen>
                             onPressed: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) => NotificationsScreen(provider: widget.provider),
+                                  builder: (_) => NotificationsScreen(
+                                    provider: widget.provider,
+                                    onOpenReviewCycle: () {
+                                      Navigator.of(context).pop();
+                                      _tabController.animateTo(1);
+                                      _pageController.animateToPage(
+                                        1,
+                                        duration: const Duration(milliseconds: 250),
+                                        curve: Curves.easeInOut,
+                                      );
+                                    },
+                                  ),
                                 ),
                               );
                             },
