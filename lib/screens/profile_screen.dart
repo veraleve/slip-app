@@ -10,9 +10,8 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final userEmail = SupabaseService().client?.auth.currentUser?.email ??
-        'peer_student@university.edu';
-    final userHandle = '@${userEmail.split('@').first}';
+    final username = SupabaseService().currentUsername ?? 'shyam_gate';
+    final userHandle = '@$username';
 
     return Scaffold(
       backgroundColor: SlipTheme.canvas,
@@ -33,7 +32,7 @@ class ProfileScreen extends StatelessWidget {
                         userHandle,
                         style: Theme.of(context).textTheme.displayMedium?.copyWith(
                               fontSize: 24,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                             ),
                       ),
                       const SizedBox(height: 2),
@@ -51,7 +50,7 @@ class ProfileScreen extends StatelessWidget {
                           Text(
                             'NOSTR SECP256K1 · VERIFIED PEER',
                             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                  color: SlipTheme.steel,
+                                  color: SlipTheme.textSecondary,
                                   fontSize: 9,
                                 ),
                           ),
@@ -70,6 +69,7 @@ class ProfileScreen extends StatelessWidget {
                       'GATE CS 2027',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                             fontWeight: FontWeight.w700,
+                            color: SlipTheme.textPrimary,
                           ),
                     ),
                   ),
@@ -107,7 +107,7 @@ class ProfileScreen extends StatelessWidget {
               Text(
                 'TOPIC VULNERABILITY RADAR',
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: 0.8,
                     ),
               ),
@@ -170,14 +170,14 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.key_rounded, size: 14, color: SlipTheme.steel),
+                    const Icon(Icons.key_rounded, size: 14, color: SlipTheme.textSecondary),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'npub1g83m9fx27zll44p80a...94zk21m',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                               fontFamily: 'monospace',
-                              color: SlipTheme.steel,
+                              color: SlipTheme.textSecondary,
                             ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -194,14 +194,14 @@ class ProfileScreen extends StatelessWidget {
                                   .labelSmall
                                   ?.copyWith(color: SlipTheme.canvas),
                             ),
-                            backgroundColor: SlipTheme.carbon,
+                            backgroundColor: SlipTheme.textPrimary,
                           ),
                         );
                       },
                       child: const Icon(
                         Icons.copy_rounded,
                         size: 14,
-                        color: SlipTheme.carbon,
+                        color: SlipTheme.textPrimary,
                       ),
                     ),
                   ],
@@ -238,7 +238,7 @@ class _StatBlock extends StatelessWidget {
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 fontWeight: FontWeight.w700,
-                color: SlipTheme.steel,
+                color: SlipTheme.textSecondary,
                 letterSpacing: 0.8,
               ),
         ),
@@ -247,14 +247,14 @@ class _StatBlock extends StatelessWidget {
           value,
           style: Theme.of(context).textTheme.displayMedium?.copyWith(
                 fontSize: 28,
-                color: color ?? SlipTheme.carbon,
+                color: color ?? SlipTheme.textPrimary,
               ),
         ),
         Text(
           sublabel,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 fontSize: 8.5,
-                color: SlipTheme.steelLight,
+                color: SlipTheme.textTertiary,
               ),
         ),
       ],
@@ -287,14 +287,14 @@ class _VulnerabilityRow extends StatelessWidget {
               topic,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: SlipTheme.carbon,
+                    color: SlipTheme.textPrimary,
                   ),
             ),
             Text(
               '${(mastery * 100).toInt()}%',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: isHighRisk ? SlipTheme.trapRed : SlipTheme.carbon,
+                    color: isHighRisk ? SlipTheme.trapRed : SlipTheme.textPrimary,
                   ),
             ),
           ],
@@ -312,7 +312,7 @@ class _VulnerabilityRow extends StatelessWidget {
               widthFactor: mastery,
               child: Container(
                 height: 3,
-                color: isHighRisk ? SlipTheme.trapRed : SlipTheme.carbon,
+                color: isHighRisk ? SlipTheme.trapRed : SlipTheme.textPrimary,
               ),
             ),
           ],
@@ -323,7 +323,7 @@ class _VulnerabilityRow extends StatelessWidget {
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 fontSize: 9,
                 fontWeight: FontWeight.w600,
-                color: isHighRisk ? SlipTheme.trapRed : SlipTheme.steel,
+                color: isHighRisk ? SlipTheme.trapRed : SlipTheme.textSecondary,
               ),
         ),
       ],

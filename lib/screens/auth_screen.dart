@@ -13,9 +13,8 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _handleController = TextEditingController();
 
   bool _isSignUp = false;
   bool _obscurePassword = true;
@@ -24,19 +23,18 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
-    _handleController.dispose();
     super.dispose();
   }
 
   Future<void> _handleAuth() async {
-    final email = _emailController.text.trim();
+    final username = _usernameController.text.trim();
     final password = _passwordController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
+    if (username.isEmpty || password.isEmpty) {
       setState(() {
-        _errorMessage = 'ENTER BOTH IDENTIFIER AND PASSPHRASE';
+        _errorMessage = 'ENTER BOTH USERNAME AND PASSWORD';
       });
       return;
     }
@@ -50,16 +48,15 @@ class _AuthScreenState extends State<AuthScreen> {
     bool success = false;
 
     if (_isSignUp) {
-      final handle = _handleController.text.trim().isNotEmpty
-          ? _handleController.text.trim()
-          : email.split('@').first;
-      success = await service.signUp(
-        email: email,
+      success = await service.signUpWithUsername(
+        username: username,
         password: password,
-        handle: handle,
       );
     } else {
-      success = await service.signIn(email: email, password: password);
+      success = await service.signInWithUsername(
+        username: username,
+        password: password,
+      );
     }
 
     setState(() {
@@ -70,7 +67,9 @@ class _AuthScreenState extends State<AuthScreen> {
       widget.onAuthenticated();
     } else {
       setState(() {
-        _errorMessage = 'AUTHENTICATION REJECTED. CHECK CREDENTIALS.';
+        _errorMessage = _isSignUp
+            ? 'USERNAME ALREADY IN USE OR INVALID PASSWORD.'
+            : 'INVALID USERNAME OR PASSWORD. TRY AGAIN.';
       });
     }
   }
@@ -109,7 +108,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         'AP-SOUTH-1 // PEER MESH ACTIVE',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                               fontWeight: FontWeight.w700,
-                              color: SlipTheme.carbon,
+                              color: SlipTheme.textPrimary,
                             ),
                       ),
                     ],
@@ -136,7 +135,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     '[SYS // 01]',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           fontWeight: FontWeight.w700,
-                          color: SlipTheme.steel,
+                          color: SlipTheme.textSecondary,
                         ),
                   ),
                 ],
@@ -145,7 +144,7 @@ class _AuthScreenState extends State<AuthScreen> {
               Text(
                 'AUTH // PEER_INOCULATION_NETWORK · v1.0',
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: SlipTheme.steel,
+                      color: SlipTheme.textSecondary,
                     ),
               ),
               const SizedBox(height: 28),
@@ -156,17 +155,23 @@ class _AuthScreenState extends State<AuthScreen> {
                   _AuthTab(
                     label: 'SIGN IN',
                     isActive: !_isSignUp,
-                    onTap: () => setState(() => _isSignUp = false),
+                    onTap: () => setState(() {
+                      _isSignUp = false;
+                      _errorMessage = null;
+                    }),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 20),
                   _AuthTab(
                     label: 'CREATE ACCOUNT',
                     isActive: _isSignUp,
-                    onTap: () => setState(() => _isSignUp = true),
+                    onTap: () => setState(() {
+                      _isSignUp = true;
+                      _errorMessage = null;
+                    }),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 28),
 
               if (_errorMessage != null) ...[
                 Container(
@@ -187,39 +192,29 @@ class _AuthScreenState extends State<AuthScreen> {
                 const SizedBox(height: 16),
               ],
 
-              // Inputs (Hairline Open Baselines)
-              if (_isSignUp) ...[
-                HairlineInput(
-                  label: 'STUDY HANDLE',
-                  placeholder: 'e.g. shyam_gate',
-                  controller: _handleController,
-                  helperText: 'REF: 0x01',
-                ),
-                const SizedBox(height: 20),
-              ],
-
+              // 1. Username Input (Pure Username, Zero Email)
               HairlineInput(
-                label: 'USER IDENTIFIER / EMAIL',
-                placeholder: 'student@university.edu',
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                helperText: 'VERIFIED',
+                label: 'USERNAME',
+                placeholder: 'e.g. shyam_gate',
+                controller: _usernameController,
+                helperText: 'UNIQUE HANDLE',
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
+              // 2. Password Input
               HairlineInput(
-                label: 'PASSPHRASE',
+                label: 'PASSWORD',
                 placeholder: '••••••••••••',
                 controller: _passwordController,
                 obscureText: _obscurePassword,
-                helperText: '128-BIT ENTROPY',
+                helperText: 'MIN 6 CHARS',
                 suffixIcon: IconButton(
                   icon: Icon(
                     _obscurePassword
                         ? Icons.visibility_off_outlined
                         : Icons.visibility_outlined,
                     size: 16,
-                    color: SlipTheme.steel,
+                    color: SlipTheme.textSecondary,
                   ),
                   onPressed: () {
                     setState(() {
@@ -230,7 +225,7 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Exam Badge
+              // Exam Stream Badge
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
@@ -243,14 +238,14 @@ class _AuthScreenState extends State<AuthScreen> {
                     const Icon(
                       Icons.school_outlined,
                       size: 14,
-                      color: SlipTheme.carbon,
+                      color: SlipTheme.textPrimary,
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'TARGET STREAM: GATE CS 2027',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                             fontWeight: FontWeight.w700,
-                            color: SlipTheme.carbon,
+                            color: SlipTheme.textPrimary,
                           ),
                     ),
                   ],
@@ -258,7 +253,7 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
               const SizedBox(height: 28),
 
-              // Primary Authenticate Button
+              // Primary Action Button
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -283,11 +278,11 @@ class _AuthScreenState extends State<AuthScreen> {
                         )
                       : Text(
                           _isSignUp
-                              ? 'CREATE IDENTITY & JOIN'
-                              : 'AUTHENTICATE & ENTER STREAM',
+                              ? 'CREATE USERNAME & JOIN'
+                              : 'SIGN IN TO STREAM',
                           style: Theme.of(context).textTheme.labelLarge?.copyWith(
                                 color: SlipTheme.canvas,
-                                letterSpacing: 1.0,
+                                letterSpacing: 0.8,
                               ),
                         ),
                 ),
@@ -301,7 +296,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   child: Text(
                     'OR CONTINUE WITH CRYPTOGRAPHIC KEY // BLE MESH',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: SlipTheme.steel,
+                          color: SlipTheme.textSecondary,
                           decoration: TextDecoration.underline,
                         ),
                   ),
@@ -312,9 +307,9 @@ class _AuthScreenState extends State<AuthScreen> {
               // Whisper Security Footer
               Center(
                 child: Text(
-                  'Zero cloud tracking without consent · Open Source · Nostr & Supabase Encrypted',
+                  'Zero cloud tracking without consent · Open Source · Encrypted Telemetry',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: SlipTheme.steelLight,
+                        color: SlipTheme.textTertiary,
                         fontSize: 9,
                       ),
                   textAlign: TextAlign.center,
@@ -350,7 +345,7 @@ class _AuthTab extends StatelessWidget {
             label,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: isActive ? SlipTheme.carbon : SlipTheme.steelLight,
+                  color: isActive ? SlipTheme.textPrimary : SlipTheme.textTertiary,
                   letterSpacing: 0.8,
                 ),
           ),
@@ -358,7 +353,7 @@ class _AuthTab extends StatelessWidget {
           Container(
             width: 24,
             height: 2,
-            color: isActive ? SlipTheme.carbon : Colors.transparent,
+            color: isActive ? SlipTheme.textPrimary : Colors.transparent,
           ),
         ],
       ),

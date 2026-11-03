@@ -2,27 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class SlipTheme {
-  // Pure Swiss Modernist Color Palette
-  static const Color canvas = Color(0xFFFAFAFA);
+  // Google Tasks Clean Material 3 Palette
+  static const Color canvas = Color(0xFFF8FAFD);
   static const Color surface = Color(0xFFFFFFFF);
-  static const Color carbon = Color(0xFF09090B);
-  static const Color steel = Color(0xFF71717A);
-  static const Color steelLight = Color(0xFFA1A1AA);
-  static const Color hairline = Color(0xFFE4E4E7);
-  static const Color trapRed = Color(0xFFDC2626);
-  static const Color clearedGreen = Color(0xFF059669);
-  static const Color signalBlue = Color(0xFF2563EB);
+  static const Color textPrimary = Color(0xFF1F1F1F);
+  static const Color textSecondary = Color(0xFF5F6368);
+  static const Color textTertiary = Color(0xFF80868B);
+  static const Color hairline = Color(0xFFE0E2EC);
+  static const Color googleBlue = Color(0xFF0B57D0);
+  static const Color googleBlueContainer = Color(0xFFD3E3FD);
+  static const Color trapRed = Color(0xFFB3261E);
+  static const Color clearedGreen = Color(0xFF137333);
+
+  // Carbon alias for high-contrast elements
+  static const Color carbon = Color(0xFF1F1F1F);
+  static const Color steel = Color(0xFF5F6368);
+  static const Color steelLight = Color(0xFF80868B);
 
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
       scaffoldBackgroundColor: canvas,
-      primaryColor: carbon,
+      primaryColor: textPrimary,
       colorScheme: const ColorScheme.light(
         surface: surface,
-        primary: carbon,
+        primary: textPrimary,
         onPrimary: canvas,
-        secondary: steel,
+        secondary: textSecondary,
         error: trapRed,
       ),
       dividerTheme: const DividerThemeData(
@@ -30,58 +36,58 @@ class SlipTheme {
         thickness: 0.5,
         space: 24,
       ),
+      // Exact Google Tasks Typography (Roboto & Roboto Mono)
       textTheme: TextTheme(
-        // Wordmark / Hero Numbers
-        displayLarge: GoogleFonts.inter(
-          fontSize: 36,
+        // Wordmark / Hero Titles
+        displayLarge: GoogleFonts.roboto(
+          fontSize: 34,
           fontWeight: FontWeight.w700,
-          color: carbon,
-          letterSpacing: -1.2,
+          color: textPrimary,
+          letterSpacing: -0.5,
         ),
-        displayMedium: GoogleFonts.inter(
-          fontSize: 28,
-          fontWeight: FontWeight.w700,
-          color: carbon,
-          letterSpacing: -0.8,
+        displayMedium: GoogleFonts.roboto(
+          fontSize: 26,
+          fontWeight: FontWeight.w600,
+          color: textPrimary,
+          letterSpacing: -0.3,
         ),
         // Trap Statements & Headlines
-        headlineSmall: GoogleFonts.inter(
-          fontSize: 18,
+        headlineSmall: GoogleFonts.roboto(
+          fontSize: 17,
           fontWeight: FontWeight.w600,
-          color: carbon,
+          color: textPrimary,
           height: 1.35,
-          letterSpacing: -0.4,
         ),
-        // Body / Conceptual Explanations
-        bodyLarge: GoogleFonts.inter(
+        // Body Text / Descriptions
+        bodyLarge: GoogleFonts.roboto(
           fontSize: 14,
           fontWeight: FontWeight.w400,
-          color: carbon,
+          color: textPrimary,
           height: 1.5,
         ),
-        bodyMedium: GoogleFonts.inter(
+        bodyMedium: GoogleFonts.roboto(
           fontSize: 13,
           fontWeight: FontWeight.w400,
-          color: steel,
+          color: textSecondary,
           height: 1.45,
         ),
-        // Monospaced Metadata & Telemetry
-        labelLarge: GoogleFonts.jetBrainsMono(
+        // Monospaced Metadata & Coordinates
+        labelLarge: GoogleFonts.robotoMono(
           fontSize: 12,
           fontWeight: FontWeight.w600,
-          color: carbon,
+          color: textPrimary,
           letterSpacing: 0.5,
         ),
-        labelMedium: GoogleFonts.jetBrainsMono(
+        labelMedium: GoogleFonts.robotoMono(
           fontSize: 11,
           fontWeight: FontWeight.w500,
-          color: steel,
-          letterSpacing: 0.8,
+          color: textSecondary,
+          letterSpacing: 0.6,
         ),
-        labelSmall: GoogleFonts.jetBrainsMono(
+        labelSmall: GoogleFonts.robotoMono(
           fontSize: 10,
           fontWeight: FontWeight.w400,
-          color: steelLight,
+          color: textTertiary,
           letterSpacing: 0.5,
         ),
       ),

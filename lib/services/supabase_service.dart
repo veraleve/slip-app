@@ -1,4 +1,6 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase/supabase.dart';
 import '../constants/app_constants.dart';
 import '../models/slip.dart';
 import 'mock_data_service.dart';
@@ -8,93 +10,149 @@ class SupabaseService {
   factory SupabaseService() => _instance;
   SupabaseService._internal();
 
-  bool _isInitialized = false;
   SupabaseClient? _client;
+  String? _currentUsername;
+  String? _currentUserId;
 
   Future<void> initialize() async {
-    if (_isInitialized) return;
     try {
-      await Supabase.initialize(
-        url: AppConstants.supabaseUrl,
-        anonKey: AppConstants.supabaseAnonKey,
+      _client = SupabaseClient(
+        AppConstants.supabaseUrl,
+        AppConstants.supabaseAnonKey,
       );
-      _client = Supabase.instance.client;
-      _isInitialized = true;
-    } catch (e) {
-      // Offline or network initialization fallback
-      _isInitialized = false;
+
+      // Restore cached session
+      final prefs = await SharedPreferences.getInstance();
+      _currentUsername = prefs.getString('slip_username');
+      _currentUserId = prefs.getString('slip_user_id');
+    } catch (_) {
+      // Offline fallback
     }
   }
 
   SupabaseClient? get client => _client;
-  bool get isAuthenticated => _client?.auth.currentUser != null;
-  String? get currentUserId => _client?.auth.currentUser?.id;
+  bool get isAuthenticated => _currentUsername != null && _currentUsername!.isNotEmpty;
+  String? get currentUsername => _currentUsername;
+  String? get currentUserId => _currentUserId ?? 'peer_local';
 
-  // Authentication
-  Future<bool> signIn({required String email, required String password}) async {
-    if (!_isInitialized || _client == null) return true; // offline mock mode
+  // Format username to internal identifier
+  String _toInternalEmail(String username) {
+    final clean = username.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9_]'), '');
+    return '$clean@slip.internal';
+  }
+
+  // --- 1. USERNAME & PASSWORD AUTHENTICATION ---
+  Future<bool> signInWithUsername({
+    required String username,
+    required String password,
+  }) async {
+    final cleanUsername = username.trim();
+    if (cleanUsername.isEmpty || password.isEmpty) return false;
+
+    if (_client == null) {
+      // Offline mode
+      await _persistSession(cleanUsername, 'user_${cleanUsername.toLowerCase()}');
+      return true;
+    }
+
     try {
+      final email = _toInternalEmail(cleanUsername);
       final res = await _client!.auth.signInWithPassword(
         email: email,
         password: password,
       );
-      return res.user != null;
-    } catch (_) {
-      return false;
-    }
-  }
 
-  Future<bool> signUp({
-    required String email,
-    required String password,
-    required String handle,
-  }) async {
-    if (!_isInitialized || _client == null) return true;
-    try {
-      final res = await _client!.auth.signUp(
-        email: email,
-        password: password,
-        data: {'handle': handle},
-      );
       if (res.user != null) {
-        // Create profile
-        await _client!.from('profiles').upsert({
-          'id': res.user!.id,
-          'handle': handle,
-          'target_exam': 'GATE CS 2027',
-        });
+        await _persistSession(cleanUsername, res.user!.id);
         return true;
       }
       return false;
-    } catch (_) {
+    } catch (e) {
+      // If server rejection, check local fallback
       return false;
     }
   }
 
-  Future<void> signOut() async {
-    if (_isInitialized && _client != null) {
-      await _client!.auth.signOut();
+  Future<bool> signUpWithUsername({
+    required String username,
+    required String password,
+    String targetExam = 'GATE CS 2027',
+  }) async {
+    final cleanUsername = username.trim();
+    if (cleanUsername.isEmpty || password.isEmpty) return false;
+
+    if (_client == null) {
+      await _persistSession(cleanUsername, 'user_${cleanUsername.toLowerCase()}');
+      return true;
+    }
+
+    try {
+      final email = _toInternalEmail(cleanUsername);
+      final res = await _client!.auth.signUp(
+        email: email,
+        password: password,
+        data: {'handle': cleanUsername},
+      );
+
+      final uid = res.user?.id ?? 'user_${cleanUsername.toLowerCase()}';
+      await _persistSession(cleanUsername, uid);
+
+      // Create profile record in Supabase
+      try {
+        await _client!.from('profiles').upsert({
+          'id': uid,
+          'handle': cleanUsername,
+          'target_exam': targetExam,
+        });
+      } catch (_) {}
+
+      return true;
+    } catch (e) {
+      return false;
     }
   }
 
-  // Feed Data
+  Future<void> _persistSession(String username, String userId) async {
+    _currentUsername = username;
+    _currentUserId = userId;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('slip_username', username);
+    await prefs.setString('slip_user_id', userId);
+  }
+
+  Future<void> signOut() async {
+    _currentUsername = null;
+    _currentUserId = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('slip_username');
+    await prefs.remove('slip_user_id');
+
+    if (_client != null) {
+      try {
+        await _client!.auth.signOut();
+      } catch (_) {}
+    }
+  }
+
+  // --- 2. STREAM & MISTAKE TELEMETRY ---
   Future<List<Slip>> fetchStream() async {
-    if (!_isInitialized || _client == null) {
+    if (_client == null) {
       return MockDataService.getInitialSlips();
     }
 
     try {
-      final data = await _client!
+      final response = await _client!
           .from('slips')
           .select()
           .order('created_at', ascending: false)
           .limit(30);
 
-      if (data.isEmpty) {
+      final list = response as List;
+      if (list.isEmpty) {
         return MockDataService.getInitialSlips();
       }
 
-      return (data as List)
+      return list
           .map((item) => Slip.fromJson(item as Map<String, dynamic>))
           .toList();
     } catch (e) {
@@ -102,31 +160,22 @@ class SupabaseService {
     }
   }
 
-  // Interactions
   Future<void> recordInteraction({
     required String slipId,
     required String interactionType,
   }) async {
-    if (!_isInitialized || _client == null || currentUserId == null) return;
+    if (_client == null || _currentUserId == null) return;
     try {
       await _client!.from('slip_interactions').upsert({
-        'user_id': currentUserId,
+        'user_id': _currentUserId,
         'slip_id': slipId,
         'interaction_type': interactionType,
       });
-
-      // Increment counters
-      if (interactionType == 'same') {
-        await _client!.rpc('increment_same_count', params: {'slip_id': slipId});
-      }
-    } catch (_) {
-      // Non-blocking interaction recording
-    }
+    } catch (_) {}
   }
 
-  // Submit Slip
   Future<bool> submitSlip(Slip slip) async {
-    if (!_isInitialized || _client == null) return true;
+    if (_client == null) return true;
     try {
       await _client!.from('slips').insert({
         'topic': slip.topic,
@@ -134,7 +183,7 @@ class SupabaseService {
         'exam_tag': slip.examTag,
         'trap_statement': slip.trapStatement,
         'fix_statement': slip.fixStatement,
-        'author_id': currentUserId,
+        'author_id': _currentUserId,
         'audio_duration_seconds': slip.audioDurationSeconds,
       });
       return true;
