@@ -1,9 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slip/models/slip.dart';
 import 'package:slip/providers/slip_provider.dart';
 import 'package:slip/services/mock_data_service.dart';
 
 void main() {
+  setUp(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({});
+  });
+
   group('Slip Model Tests', () {
     test('Slip serialization and deserialization works correctly', () {
       final now = DateTime.now();
