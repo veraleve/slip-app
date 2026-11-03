@@ -198,19 +198,3 @@ class Slip {
     );
   }
 }
-      scratchpadImageUrl: scratchpadImageUrl ?? this.scratchpadImageUrl,
-      voiceAudioUrl: voiceAudioUrl ?? this.voiceAudioUrl,
-      whiteboardVideoUrl: whiteboardVideoUrl ?? this.whiteboardVideoUrl,
-      audioDurationSeconds: audioDurationSeconds ?? this.audioDurationSeconds,
-      sameCount: sameCount ?? this.sameCount,
-      clearedCount: clearedCount ?? this.clearedCount,
-      keepCount: keepCount ?? this.keepCount,
-      createdAt: createdAt ?? this.createdAt,
-      hasSaidSame: hasSaidSame ?? this.hasSaidSame,
-      hasKept: hasKept ?? this.hasKept,
-      hasCleared: hasCleared ?? this.hasCleared,
-      isFixRevealed: isFixRevealed ?? this.isFixRevealed,
-      allowComments: allowComments ?? this.allowComments,
-    );
-  }
-}
