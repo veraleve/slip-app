@@ -376,6 +376,7 @@ class _TasksScreenState extends State<TasksScreen> {
     String selectedExam = userExams.isNotEmpty ? userExams.first : GateSyllabus.gateCS;
     final subjects = GateSyllabus.getSubjectsForExam(selectedExam);
     String selectedSubject = subjects.first;
+    String selectedTopic = 'All Topics';
     List<String> selectedTopics = [];
     DateTime scheduledDate = DateTime.now().add(const Duration(days: 1));
     TimeOfDay scheduledTime = const TimeOfDay(hour: 9, minute: 0);
@@ -394,6 +395,10 @@ class _TasksScreenState extends State<TasksScreen> {
           builder: (dialogCtx, setSheetState) {
             final availableSubtopics =
                 GateSyllabus.getSubtopics(selectedExam, selectedSubject);
+
+            if (selectedTopic != 'All Topics' && !availableSubtopics.contains(selectedTopic)) {
+              selectedTopic = 'All Topics';
+            }
 
             return Padding(
               padding: EdgeInsets.only(
@@ -471,6 +476,7 @@ class _TasksScreenState extends State<TasksScreen> {
                               selectedExam = exam;
                               final newSubjects = GateSyllabus.getSubjectsForExam(exam);
                               selectedSubject = newSubjects.first;
+                              selectedTopic = 'All Topics';
                               selectedTopics.clear();
                             });
                           },
@@ -479,7 +485,7 @@ class _TasksScreenState extends State<TasksScreen> {
                     ),
                     const SizedBox(height: 14),
 
-                    // Subject Selector
+                    // Subject Selector Dropdown
                     Text(
                       'SUBJECT',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -494,6 +500,7 @@ class _TasksScreenState extends State<TasksScreen> {
                       decoration: BoxDecoration(
                         border: Border.all(color: SlipTheme.hairline, width: 0.8),
                         borderRadius: BorderRadius.circular(2),
+                        color: SlipTheme.surface,
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
@@ -514,6 +521,7 @@ class _TasksScreenState extends State<TasksScreen> {
                             if (val != null) {
                               setSheetState(() {
                                 selectedSubject = val;
+                                selectedTopic = 'All Topics';
                                 selectedTopics.clear();
                               });
                             }
@@ -523,51 +531,60 @@ class _TasksScreenState extends State<TasksScreen> {
                     ),
                     const SizedBox(height: 14),
 
-                    // Topics Selector
-                    if (availableSubtopics.isNotEmpty) ...[
-                      Text(
-                        'SYLLABUS TOPICS (FOR BLUNDER INOCULATION)',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: SlipTheme.steel,
-                              fontSize: 9.5,
-                            ),
+                    // Cascading Topics Selector Dropdown
+                    Text(
+                      'SYLLABUS TOPIC (FOR INOCULATION)',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: SlipTheme.steel,
+                            fontSize: 9.5,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: SlipTheme.hairline, width: 0.8),
+                        borderRadius: BorderRadius.circular(2),
+                        color: SlipTheme.surface,
                       ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: availableSubtopics.map((t) {
-                          final isChosen = selectedTopics.contains(t);
-                          return FilterChip(
-                            label: Text(
-                              t,
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: isChosen ? SlipTheme.canvas : SlipTheme.carbon,
-                              ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: selectedTopic,
+                          isExpanded: true,
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            color: SlipTheme.carbon,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          items: [
+                            const DropdownMenuItem(
+                              value: 'All Topics',
+                              child: Text('All Topics (Full Subject Inoculation)', overflow: TextOverflow.ellipsis),
                             ),
-                            selected: isChosen,
-                            selectedColor: SlipTheme.carbon,
-                            backgroundColor: SlipTheme.surface,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(2),
-                              side: const BorderSide(color: SlipTheme.hairline, width: 0.8),
-                            ),
-                            onSelected: (val) {
+                            ...availableSubtopics.map((t) {
+                              return DropdownMenuItem(
+                                value: t,
+                                child: Text(t, overflow: TextOverflow.ellipsis),
+                              );
+                            }),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
                               setSheetState(() {
-                                if (val) {
-                                  selectedTopics.add(t);
+                                selectedTopic = val;
+                                if (val == 'All Topics') {
+                                  selectedTopics = List<String>.from(availableSubtopics);
                                 } else {
-                                  selectedTopics.remove(t);
+                                  selectedTopics = [val];
                                 }
                               });
-                            },
-                          );
-                        }).toList(),
+                            }
+                          },
+                        ),
                       ),
-                      const SizedBox(height: 14),
-                    ],
+                    ),
+                    const SizedBox(height: 14),
 
                     // Date & Time Picker Row
                     Row(

@@ -214,6 +214,19 @@ class SupabaseService {
     }
   }
 
+  static String generateUuid() {
+    final rnd = Random();
+    final bytes = List<int>.generate(16, (_) => rnd.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant RFC4122
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}';
+  }
+
+  static bool isUuid(String str) {
+    return RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(str);
+  }
+
   // --- LOCAL-FIRST OFFLINE STORAGE FOR USER SLIPS ---
   Future<List<Slip>> loadLocalUserSlips() async {
     try {
@@ -236,6 +249,8 @@ class SupabaseService {
 
   Future<List<Slip>> fetchStream({
     String? topicFilter,
+    String? subtopicFilter,
+    PostType? postTypeFilter,
     List<String>? userPapers,
   }) async {
     final allowedPapers = (userPapers != null && userPapers.isNotEmpty)
@@ -247,7 +262,17 @@ class SupabaseService {
 
     if (_client == null) {
       final mock = MockDataService.getInitialSlips();
-      return [...localUserSlips, ...mock.where((s) => allowedPapers.contains(s.examTag))];
+      var combined = [...localUserSlips, ...mock.where((s) => allowedPapers.contains(s.examTag))];
+      if (postTypeFilter != null) {
+        combined = combined.where((s) => s.postType == postTypeFilter).toList();
+      }
+      if (topicFilter != null && topicFilter.isNotEmpty && topicFilter != 'All' && topicFilter != 'For You') {
+        combined = combined.where((s) => s.topic == topicFilter).toList();
+      }
+      if (subtopicFilter != null && subtopicFilter.isNotEmpty && subtopicFilter != 'All Topics') {
+        combined = combined.where((s) => s.subtopic == subtopicFilter).toList();
+      }
+      return combined;
     }
 
     try {
@@ -260,13 +285,21 @@ class SupabaseService {
         query = query.inFilter('exam_tag', allowedPapers);
       }
 
+      if (postTypeFilter != null) {
+        query = query.eq('post_type', postTypeFilter.name);
+      }
+
       if (topicFilter != null && topicFilter.isNotEmpty && topicFilter != 'All' && topicFilter != 'For You') {
         query = query.eq('topic', topicFilter);
       }
 
+      if (subtopicFilter != null && subtopicFilter.isNotEmpty && subtopicFilter != 'All Topics') {
+        query = query.eq('subtopic', subtopicFilter);
+      }
+
       final response = await query
           .order('created_at', ascending: false)
-          .limit(50);
+          .limit(60);
       final list = response as List;
 
       final fetched = list
@@ -281,13 +314,34 @@ class SupabaseService {
         merged[s.id] = s;
       }
 
-      final result = merged.values.toList();
+      var result = merged.values.toList();
       result.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      if (postTypeFilter != null) {
+        result = result.where((s) => s.postType == postTypeFilter).toList();
+      }
+      if (topicFilter != null && topicFilter.isNotEmpty && topicFilter != 'All' && topicFilter != 'For You') {
+        result = result.where((s) => s.topic == topicFilter).toList();
+      }
+      if (subtopicFilter != null && subtopicFilter.isNotEmpty && subtopicFilter != 'All Topics') {
+        result = result.where((s) => s.subtopic == subtopicFilter).toList();
+      }
+
       return result;
     } catch (e) {
       // Offline fallback: return user's local slips + mock data
       final mock = MockDataService.getInitialSlips();
-      return [...localUserSlips, ...mock.where((s) => allowedPapers.contains(s.examTag))];
+      var combined = [...localUserSlips, ...mock.where((s) => allowedPapers.contains(s.examTag))];
+      if (postTypeFilter != null) {
+        combined = combined.where((s) => s.postType == postTypeFilter).toList();
+      }
+      if (topicFilter != null && topicFilter.isNotEmpty && topicFilter != 'All' && topicFilter != 'For You') {
+        combined = combined.where((s) => s.topic == topicFilter).toList();
+      }
+      if (subtopicFilter != null && subtopicFilter.isNotEmpty && subtopicFilter != 'All Topics') {
+        combined = combined.where((s) => s.subtopic == subtopicFilter).toList();
+      }
+      return combined;
     }
   }
 
@@ -308,26 +362,56 @@ class SupabaseService {
   Future<bool> submitSlip(Slip slip) async {
     // 1. Immediately cache locally for offline access
     final local = await loadLocalUserSlips();
+    local.removeWhere((s) => s.id == slip.id);
     local.insert(0, slip);
     await saveLocalUserSlips(local);
 
     if (_client == null) return true;
     try {
+      String? validAuthorId;
+      if (slip.authorId != null && isUuid(slip.authorId!)) {
+        validAuthorId = slip.authorId;
+      }
+
       await _client!.from('slips').insert({
         'id': slip.id,
         'topic': slip.topic,
         'subtopic': slip.subtopic,
         'exam_tag': slip.examTag,
+        'post_type': slip.postType.name,
+        'title': slip.title,
+        'is_resolved': slip.isResolved,
+        'is_public': slip.isPublic,
         'trap_statement': slip.trapStatement,
         'fix_statement': slip.fixStatement,
-        'image_uris': slip.imageUris,
-        'author_id': _currentUserId,
+        'scratchpad_image_url': slip.imageUris.isNotEmpty ? slip.imageUris.first : null,
+        'author_id': validAuthorId,
+        'author_handle': slip.authorUsername ?? _currentUsername ?? 'peer',
         'audio_duration_seconds': slip.audioDurationSeconds,
       });
       return true;
     } catch (_) {
       return false;
     }
+  }
+
+  Future<bool> toggleDoubtResolved(String slipId, bool isResolved) async {
+    final local = await loadLocalUserSlips();
+    final idx = local.indexWhere((s) => s.id == slipId);
+    if (idx != -1) {
+      local[idx] = local[idx].copyWith(isResolved: isResolved);
+      await saveLocalUserSlips(local);
+    }
+
+    if (_client != null) {
+      try {
+        await _client!.from('slips').update({
+          'is_resolved': isResolved,
+        }).eq('id', slipId);
+        return true;
+      } catch (_) {}
+    }
+    return true;
   }
 
   Future<bool> updateSlip(Slip slip) async {
@@ -345,9 +429,12 @@ class SupabaseService {
         'topic': slip.topic,
         'subtopic': slip.subtopic,
         'exam_tag': slip.examTag,
+        'post_type': slip.postType.name,
+        'title': slip.title,
+        'is_resolved': slip.isResolved,
         'trap_statement': slip.trapStatement,
         'fix_statement': slip.fixStatement,
-        'image_uris': slip.imageUris,
+        'scratchpad_image_url': slip.imageUris.isNotEmpty ? slip.imageUris.first : null,
         'audio_duration_seconds': slip.audioDurationSeconds,
       }).eq('id', slip.id);
       return true;
@@ -411,12 +498,14 @@ class SupabaseService {
   Future<bool> postComment({
     required String slipId,
     required String body,
+    bool isAcceptedAnswer = false,
   }) async {
     final comment = {
-      'id': 'cmt_${DateTime.now().millisecondsSinceEpoch}',
+      'id': generateUuid(),
       'slip_id': slipId,
       'author_handle': _currentUsername ?? 'peer',
       'body': body,
+      'is_accepted_answer': isAcceptedAnswer,
       'created_at': DateTime.now().toIso8601String(),
     };
 

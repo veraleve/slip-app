@@ -55,7 +55,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _testAlert() async {
     final primaryExam = SupabaseService().targetExams.isNotEmpty
         ? SupabaseService().targetExams.first
-        : 'GATE 2027';
+        : GateSyllabus.gateCS;
     await NativeDeviceService.showNotification(
       title: 'Slip Inoculation Alert · $primaryExam',
       body: 'Morning trap check: Review eigenvalues of singular matrices before your mock test.',

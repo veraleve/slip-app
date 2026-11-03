@@ -66,7 +66,7 @@ class _CommentThreadSheetState extends State<CommentThreadSheet> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'PEER DISCUSSION (${_comments.length})',
+                'PEER ANSWERS & DISCUSSION (${_comments.length})',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: SlipTheme.steel,
@@ -101,7 +101,7 @@ class _CommentThreadSheetState extends State<CommentThreadSheet> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Text(
-                'No peer comments yet. Share an alternative approach or ask for clarification below.',
+                'No peer answers yet. Write an explanation, hint, or solution below.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: SlipTheme.steel,
                       fontSize: 11,
@@ -133,9 +133,28 @@ class _CommentThreadSheetState extends State<CommentThreadSheet> {
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: SlipTheme.carbon,
                               fontSize: 11.5,
+                              height: 1.35,
                             ),
                       ),
                     ),
+                    if (c.isAcceptedAnswer) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: SlipTheme.clearedGreen.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                        child: const Text(
+                          'ACCEPTED',
+                          style: TextStyle(
+                            fontSize: 7.5,
+                            fontWeight: FontWeight.w800,
+                            color: SlipTheme.clearedGreen,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 );
               },
@@ -150,7 +169,7 @@ class _CommentThreadSheetState extends State<CommentThreadSheet> {
                   controller: _commentController,
                   style: const TextStyle(fontSize: 12),
                   decoration: const InputDecoration(
-                    hintText: 'Add conceptual note or question...',
+                    hintText: 'Answer doubt or write conceptual note...',
                     hintStyle: TextStyle(fontSize: 11, color: SlipTheme.steel),
                     isDense: true,
                     contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),

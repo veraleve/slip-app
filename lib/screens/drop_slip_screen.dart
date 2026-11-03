@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../constants/gate_syllabus.dart';
+import '../models/slip.dart';
 import '../providers/slip_provider.dart';
 import '../services/native_device_service.dart';
 import '../theme/slip_theme.dart';
@@ -18,9 +19,13 @@ class DropSlipScreen extends StatefulWidget {
 }
 
 class _DropSlipScreenState extends State<DropSlipScreen> {
+  PostType _activeMode = PostType.doubt;
+
   late String _selectedExam;
   late String _selectedSubject;
-  final TextEditingController _subtopicController = TextEditingController();
+  late String _selectedSubtopic;
+
+  final TextEditingController _titleController = TextEditingController();
   final TextEditingController _trapController = TextEditingController();
   final TextEditingController _fixController = TextEditingController();
 
@@ -43,12 +48,14 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
     _selectedExam = userExams.isNotEmpty ? userExams.first : GateSyllabus.gateCS;
     final subjects = GateSyllabus.getSubjectsForExam(_selectedExam);
     _selectedSubject = subjects.first;
+    final topics = GateSyllabus.getSubtopics(_selectedExam, _selectedSubject);
+    _selectedSubtopic = topics.isNotEmpty ? topics.first : 'General';
   }
 
   @override
   void dispose() {
     _voiceTimer?.cancel();
-    _subtopicController.dispose();
+    _titleController.dispose();
     _trapController.dispose();
     _fixController.dispose();
     super.dispose();
@@ -59,14 +66,22 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
       _selectedExam = exam;
       final subjects = GateSyllabus.getSubjectsForExam(exam);
       _selectedSubject = subjects.first;
-      _subtopicController.clear();
+      final topics = GateSyllabus.getSubtopics(exam, _selectedSubject);
+      _selectedSubtopic = topics.isNotEmpty ? topics.first : 'General';
     });
   }
 
   void _onSubjectChanged(String subject) {
     setState(() {
       _selectedSubject = subject;
-      _subtopicController.clear();
+      final topics = GateSyllabus.getSubtopics(_selectedExam, subject);
+      _selectedSubtopic = topics.isNotEmpty ? topics.first : 'General';
+    });
+  }
+
+  void _onSubtopicChanged(String subtopic) {
+    setState(() {
+      _selectedSubtopic = subtopic;
     });
   }
 
@@ -114,7 +129,7 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
 
   void _resetForm() {
     setState(() {
-      _subtopicController.clear();
+      _titleController.clear();
       _trapController.clear();
       _fixController.clear();
       _attachedImages.clear();
@@ -124,6 +139,8 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
   }
 
   void _showSuccessConfirmationDialog() {
+    final isDoubt = _activeMode == PostType.doubt;
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -153,7 +170,7 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
               ),
               const SizedBox(height: 18),
               Text(
-                'BLUNDER LOGGED & SHARED',
+                isDoubt ? 'DOUBT POSTED TO PEERS' : 'BLUNDER LOGGED',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w800,
@@ -163,7 +180,11 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Your mistake on "$_selectedSubject" is now inoculating peers across the mesh.',
+                isDoubt
+                    ? 'Peers preparing for "$_selectedSubject" can now see and answer your question.'
+                    : (_isPublic
+                        ? 'Your mistake on "$_selectedSubject" is now inoculating peers.'
+                        : 'Your mistake on "$_selectedSubject" is saved safely to your local device.'),
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: SlipTheme.steel,
@@ -184,9 +205,9 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                         side: const BorderSide(color: SlipTheme.hairline, width: 0.8),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                       ),
-                      child: const Text(
-                        'DROP ANOTHER',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+                      child: Text(
+                        isDoubt ? 'ASK ANOTHER' : 'DROP ANOTHER',
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
                       ),
                     ),
                   ),
@@ -220,50 +241,63 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
   }
 
   Future<void> _submitSlip() async {
+    final isDoubt = _activeMode == PostType.doubt;
+    final title = _titleController.text.trim();
     final trap = _trapController.text.trim();
     final fix = _fixController.text.trim();
 
-    if (trap.isEmpty || fix.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Please fill both the blunder trap and the fix statement.',
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: SlipTheme.canvas),
+    if (isDoubt) {
+      if (title.isEmpty || trap.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Please provide both a doubt title and detailed question context.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: SlipTheme.canvas),
+            ),
+            backgroundColor: SlipTheme.trapRed,
           ),
-          backgroundColor: SlipTheme.trapRed,
-        ),
-      );
-      return;
+        );
+        return;
+      }
+    } else {
+      if (trap.isEmpty || fix.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Please describe both the blunder trap and the fix statement.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: SlipTheme.canvas),
+            ),
+            backgroundColor: SlipTheme.trapRed,
+          ),
+        );
+        return;
+      }
     }
 
     setState(() => _isSubmitting = true);
 
-    final subtopic = _subtopicController.text.trim().isNotEmpty
-        ? _subtopicController.text.trim()
-        : 'General Trap';
-
     final success = await widget.provider.dropSlip(
       examTag: _selectedExam,
       topic: _selectedSubject,
-      subtopic: subtopic,
+      subtopic: _selectedSubtopic,
+      postType: _activeMode,
+      title: isDoubt ? title : null,
       trapStatement: trap,
       fixStatement: fix,
       imageUris: _attachedImages,
       audioDurationSeconds: _hasVoiceNote ? _voiceSeconds : 0,
       allowComments: _allowComments,
-      isPublic: _isPublic,
+      isPublic: isDoubt ? true : _isPublic,
     );
 
     setState(() => _isSubmitting = false);
 
     if (success && mounted) {
-      // Trigger native notification
       NativeDeviceService.showNotification(
-        title: 'Blunder Logged · $_selectedExam',
-        body: 'Your mistake on "$_selectedSubject" is now inoculating peers.',
+        title: isDoubt ? 'Doubt Posted · $_selectedExam' : 'Blunder Logged · $_selectedExam',
+        body: isDoubt
+            ? 'Your question on "$_selectedSubject" is live for peer answers.'
+            : 'Your mistake on "$_selectedSubject" is recorded.',
       );
 
       _showSuccessConfirmationDialog();
@@ -273,8 +307,20 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
   @override
   Widget build(BuildContext context) {
     final availableSubjects = GateSyllabus.getSubjectsForExam(_selectedExam);
-    final suggestedSubtopics =
-        GateSyllabus.getSubtopics(_selectedExam, _selectedSubject);
+    final availableSubtopics = GateSyllabus.getSubtopics(_selectedExam, _selectedSubject);
+
+    // Ensure valid selections
+    if (!availableSubjects.contains(_selectedSubject)) {
+      _selectedSubject = availableSubjects.first;
+    }
+    final allSubtopicOptions = availableSubtopics.isNotEmpty
+        ? availableSubtopics
+        : ['General'];
+    if (!allSubtopicOptions.contains(_selectedSubtopic)) {
+      _selectedSubtopic = allSubtopicOptions.first;
+    }
+
+    final isDoubt = _activeMode == PostType.doubt;
 
     return Scaffold(
       backgroundColor: SlipTheme.canvas,
@@ -286,7 +332,7 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
             children: [
               // Clean Header
               Text(
-                'Drop a Blunder',
+                'Create Post',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                       color: SlipTheme.carbon,
@@ -295,16 +341,112 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Log what tripped you up and the exact principle to never fall for it again.',
+                isDoubt
+                    ? 'Ask peers a conceptual question or problem you are stuck on.'
+                    : 'Log an exam test trap and the exact principle to inoculate yourself.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: SlipTheme.steel,
                     ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 18),
+
+              // 0. Dual Mode Toggle: [ ASK A DOUBT ] | [ LOG A MISTAKE ]
+              Container(
+                padding: const EdgeInsets.all(2.5),
+                decoration: BoxDecoration(
+                  color: SlipTheme.surface,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: SlipTheme.hairline, width: 0.8),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _activeMode = PostType.doubt;
+                            _isPublic = true;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          decoration: BoxDecoration(
+                            color: isDoubt ? SlipTheme.carbon : Colors.transparent,
+                            borderRadius: BorderRadius.circular(2.5),
+                          ),
+                          child: Center(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.help_outline_rounded,
+                                  size: 14,
+                                  color: isDoubt ? SlipTheme.canvas : SlipTheme.steel,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'ASK A DOUBT',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.5,
+                                    color: isDoubt ? SlipTheme.canvas : SlipTheme.steel,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _activeMode = PostType.mistake;
+                            _isPublic = false; // Mistakes local by default
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          decoration: BoxDecoration(
+                            color: !isDoubt ? SlipTheme.carbon : Colors.transparent,
+                            borderRadius: BorderRadius.circular(2.5),
+                          ),
+                          child: Center(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.warning_amber_rounded,
+                                  size: 14,
+                                  color: !isDoubt ? SlipTheme.canvas : SlipTheme.steel,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'LOG A MISTAKE',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.5,
+                                    color: !isDoubt ? SlipTheme.canvas : SlipTheme.steel,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 18),
               const Divider(color: SlipTheme.hairline, height: 1),
               const SizedBox(height: 18),
 
-              // 1. Exam Target
+              // 1. Cascading Selector 1: Exam Paper
               Text(
                 'EXAM PAPER',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -341,7 +483,7 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
 
               const SizedBox(height: 18),
 
-              // 2. Canonical Subject
+              // 2. Cascading Selector 2: Subject Dropdown
               Text(
                 'SYLLABUS SUBJECT',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -382,9 +524,9 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
 
               const SizedBox(height: 18),
 
-              // 3. Subtopic / Concept
+              // 3. Cascading Selector 3: Topic Dropdown (Cascaded dynamically from Subject)
               Text(
-                'SPECIFIC TOPIC / CONCEPT',
+                'SYLLABUS TOPIC',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: SlipTheme.steel,
@@ -392,105 +534,152 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                     ),
               ),
               const SizedBox(height: 8),
-              HairlineInput(
-                controller: _subtopicController,
-                placeholder: 'e.g. Eigenvalues, Pipeline Forwarding, LR(1) Parsers',
-                maxLines: 1,
-              ),
-
-              if (suggestedSubtopics.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: suggestedSubtopics.take(6).map((sub) {
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: ActionChip(
-                          label: Text(
-                            sub,
-                            style: const TextStyle(fontSize: 10.5, color: SlipTheme.steel),
-                          ),
-                          backgroundColor: SlipTheme.surface,
-                          side: const BorderSide(color: SlipTheme.hairline, width: 0.8),
-                          padding: const EdgeInsets.all(2),
-                          onPressed: () {
-                            setState(() {
-                              _subtopicController.text = sub;
-                            });
-                          },
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: SlipTheme.hairline, width: 0.8),
+                  borderRadius: BorderRadius.circular(3),
+                  color: SlipTheme.surface,
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedSubtopic,
+                    isExpanded: true,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: SlipTheme.carbon,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
                         ),
+                    items: allSubtopicOptions.map((top) {
+                      return DropdownMenuItem(
+                        value: top,
+                        child: Text(top, overflow: TextOverflow.ellipsis),
                       );
                     }).toList(),
+                    onChanged: (val) {
+                      if (val != null) _onSubtopicChanged(val);
+                    },
                   ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // 4. Form inputs based on Active Mode
+              if (isDoubt) ...[
+                // Question Title
+                Text(
+                  'DOUBT TITLE / CORE QUESTION',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: SlipTheme.carbon,
+                        letterSpacing: 0.6,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                HairlineInput(
+                  controller: _titleController,
+                  placeholder: 'e.g. Why is L1 cache virtually indexed in VIPT?',
+                  maxLines: 1,
+                ),
+                const SizedBox(height: 18),
+
+                // Question Context / Description
+                Text(
+                  'DETAILED CONTEXT / WHAT CONFUSED YOU',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: SlipTheme.steel,
+                        letterSpacing: 0.6,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                HairlineInput(
+                  controller: _trapController,
+                  placeholder: 'Describe the problem statement, theorem, or calculation you need help with...',
+                  maxLines: 4,
+                ),
+                const SizedBox(height: 18),
+
+                // Optional Answer / Working
+                Text(
+                  'YOUR WORKING / ATTEMPT (OPTIONAL)',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: SlipTheme.steel,
+                        letterSpacing: 0.6,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                HairlineInput(
+                  controller: _fixController,
+                  placeholder: 'Add what you tried or any formula you attempted...',
+                  maxLines: 3,
+                ),
+              ] else ...[
+                // Mistake Trap
+                Row(
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                        color: SlipTheme.trapRed,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'THE BLUNDER (WHAT TRIPPED YOU UP)',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: SlipTheme.trapRed,
+                            letterSpacing: 0.6,
+                          ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                HairlineInput(
+                  controller: _trapController,
+                  placeholder: 'Describe the false assumption or conceptual trap you fell for...',
+                  maxLines: 4,
+                ),
+                const SizedBox(height: 20),
+
+                // Mistake Fix
+                Row(
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                        color: SlipTheme.clearedGreen,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'THE FIX (THE UNFORGETTABLE PRINCIPLE)',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: SlipTheme.clearedGreen,
+                            letterSpacing: 0.6,
+                          ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                HairlineInput(
+                  controller: _fixController,
+                  placeholder: 'What is the correct, rigorous logic or rule to remember?',
+                  maxLines: 4,
                 ),
               ],
 
-              const SizedBox(height: 20),
-
-              // 4. The Blunder Trap
-              Row(
-                children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: const BoxDecoration(
-                      color: SlipTheme.trapRed,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'THE BLUNDER (WHAT TRIPPED YOU UP)',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: SlipTheme.trapRed,
-                          letterSpacing: 0.6,
-                        ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              HairlineInput(
-                controller: _trapController,
-                placeholder: 'Describe the false assumption or conceptual trap you fell for...',
-                maxLines: 4,
-              ),
-
-              const SizedBox(height: 20),
-
-              // 5. The Fix
-              Row(
-                children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: const BoxDecoration(
-                      color: SlipTheme.clearedGreen,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'THE FIX (THE UNFORGETTABLE PRINCIPLE)',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: SlipTheme.clearedGreen,
-                          letterSpacing: 0.6,
-                        ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              HairlineInput(
-                controller: _fixController,
-                placeholder: 'What is the correct, rigorous logic or rule to remember?',
-                maxLines: 4,
-              ),
-
               const SizedBox(height: 24),
 
-              // 6. Media Options: Camera & Voice Recording
+              // 5. Media Options: Camera & Voice Recording
               Text(
                 'ATTACH EVIDENCE (PHOTOS & VOICE NOTE)',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -503,7 +692,6 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
 
               Row(
                 children: [
-                  // Camera Capture Button
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: _capturePhoto,
@@ -522,8 +710,6 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                     ),
                   ),
                   const SizedBox(width: 10),
-
-                  // Voice Record Button
                   Expanded(
                     child: _isRecordingVoice
                         ? ElevatedButton.icon(
@@ -664,118 +850,122 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                 ),
               ],
 
-              // 7. Visibility: Public vs Private
-              Text(
-                'VISIBILITY & PRIVACY',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: SlipTheme.steel,
-                      letterSpacing: 0.6,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _isPublic = true),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: _isPublic ? SlipTheme.carbon : SlipTheme.surface,
-                          border: Border.all(
-                            color: _isPublic ? SlipTheme.carbon : SlipTheme.hairline,
-                            width: 0.8,
-                          ),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.public_rounded,
-                              size: 14,
-                              color: _isPublic ? SlipTheme.canvas : SlipTheme.carbon,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'PUBLIC (INOCULATE)',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: _isPublic ? SlipTheme.canvas : SlipTheme.carbon,
-                              ),
-                            ),
-                          ],
-                        ),
+              const SizedBox(height: 20),
+
+              // 6. Visibility: Public vs Private (for Mistakes)
+              if (!isDoubt) ...[
+                Text(
+                  'STORAGE & PRIVACY',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: SlipTheme.steel,
+                        letterSpacing: 0.6,
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _isPublic = false),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: !_isPublic ? SlipTheme.carbon : SlipTheme.surface,
-                          border: Border.all(
-                            color: !_isPublic ? SlipTheme.carbon : SlipTheme.hairline,
-                            width: 0.8,
-                          ),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.lock_outline_rounded,
-                              size: 14,
-                              color: !_isPublic ? SlipTheme.canvas : SlipTheme.carbon,
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _isPublic = false),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: !_isPublic ? SlipTheme.carbon : SlipTheme.surface,
+                            border: Border.all(
+                              color: !_isPublic ? SlipTheme.carbon : SlipTheme.hairline,
+                              width: 0.8,
                             ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'PRIVATE (LOCAL)',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.lock_outline_rounded,
+                                size: 14,
                                 color: !_isPublic ? SlipTheme.canvas : SlipTheme.carbon,
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 6),
+                              Text(
+                                'PRIVATE (DEVICE ONLY)',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: !_isPublic ? SlipTheme.canvas : SlipTheme.carbon,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _isPublic = true),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _isPublic ? SlipTheme.carbon : SlipTheme.surface,
+                            border: Border.all(
+                              color: _isPublic ? SlipTheme.carbon : SlipTheme.hairline,
+                              width: 0.8,
+                            ),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.public_rounded,
+                                size: 14,
+                                color: _isPublic ? SlipTheme.canvas : SlipTheme.carbon,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'SHARE WITH PEERS',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: _isPublic ? SlipTheme.canvas : SlipTheme.carbon,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (!_isPublic) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: SlipTheme.surface,
+                      borderRadius: BorderRadius.circular(2),
+                      border: Border.all(color: SlipTheme.hairline, width: 0.6),
+                    ),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.info_outline_rounded, size: 13, color: SlipTheme.steel),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Stored in local phone storage. Note: If you uninstall the app or clear app storage, local private mistakes will be gone.',
+                            style: TextStyle(fontSize: 10, color: SlipTheme.steel, height: 1.35),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
-              ),
-              if (!_isPublic) ...[
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: SlipTheme.surface,
-                    borderRadius: BorderRadius.circular(2),
-                    border: Border.all(color: SlipTheme.hairline, width: 0.6),
-                  ),
-                  child: const Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.info_outline_rounded, size: 13, color: SlipTheme.steel),
-                      SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          'Stored only in local phone space. Note: If you uninstall the app or clear app data, private mistakes will be gone.',
-                          style: TextStyle(fontSize: 10, color: SlipTheme.steel, height: 1.35),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                const SizedBox(height: 16),
               ],
-              const SizedBox(height: 16),
 
-              // 8. Peer Comments Toggle Button
+              // 7. Peer Comments Toggle Button
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
@@ -800,7 +990,7 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'ALLOW PEER COMMENTS',
+                              isDoubt ? 'ALLOW PEER SOLUTIONS' : 'ALLOW PEER COMMENTS',
                               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 10,
@@ -809,8 +999,8 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                             ),
                             Text(
                               _allowComments
-                                  ? 'Peers can discuss this blunder & ask questions'
-                                  : 'Comments turned off for this slip',
+                                  ? (isDoubt ? 'Peers can answer and explain this doubt' : 'Peers can discuss this blunder & ask questions')
+                                  : 'Discussions turned off',
                               style: const TextStyle(fontSize: 9.5, color: SlipTheme.steel),
                             ),
                           ],
@@ -854,7 +1044,7 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                           ),
                         )
                       : Text(
-                          'DROP SLIP',
+                          isDoubt ? 'POST DOUBT TO PEERS' : 'SAVE MISTAKE',
                           style: Theme.of(context).textTheme.labelMedium?.copyWith(
                                 fontWeight: FontWeight.w700,
                                 color: SlipTheme.canvas,
@@ -864,7 +1054,7 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                 ),
               ),
 
-              // CRITICAL: Bottom spacing to prevent button occlusion by NavDock
+              // Bottom spacing to prevent button occlusion by NavDock
               const SizedBox(height: 100),
             ],
           ),

@@ -1,10 +1,18 @@
 import '../constants/gate_syllabus.dart';
 
+enum PostType {
+  doubt,
+  mistake,
+}
+
 class Slip {
   final String id;
   final String? authorId;
   final String? authorUsername;
   final bool isPublic;
+  final PostType postType;
+  final String? title;
+  final bool isResolved;
   final String topic;
   final String? subtopic;
   final String examTag;
@@ -32,6 +40,9 @@ class Slip {
     this.authorId,
     this.authorUsername,
     this.isPublic = true,
+    this.postType = PostType.doubt,
+    this.title,
+    this.isResolved = false,
     required this.topic,
     this.subtopic,
     this.examTag = GateSyllabus.gateCS,
@@ -63,11 +74,25 @@ class Slip {
 
     final rawExam = json['exam_tag'] as String? ?? GateSyllabus.gateCS;
 
+    PostType parsedType = PostType.doubt;
+    final typeStr = json['post_type'] as String?;
+    if (typeStr == 'mistake') {
+      parsedType = PostType.mistake;
+    } else if (typeStr == 'doubt') {
+      parsedType = PostType.doubt;
+    } else if (json['title'] == null || (json['title'] as String).isEmpty) {
+      // Legacy fallback: items with no title were mistake slips
+      parsedType = PostType.mistake;
+    }
+
     return Slip(
       id: json['id'] as String,
       authorId: json['author_id'] as String?,
       authorUsername: json['author_username'] as String?,
       isPublic: json['is_public'] as bool? ?? true,
+      postType: parsedType,
+      title: json['title'] as String?,
+      isResolved: json['is_resolved'] as bool? ?? false,
       topic: json['topic'] as String? ?? 'General',
       subtopic: json['subtopic'] as String?,
       examTag: GateSyllabus.normalizeExam(rawExam),
@@ -94,6 +119,9 @@ class Slip {
       'author_id': authorId,
       'author_username': authorUsername,
       'is_public': isPublic,
+      'post_type': postType.name,
+      'title': title,
+      'is_resolved': isResolved,
       'topic': topic,
       'subtopic': subtopic,
       'exam_tag': examTag,
@@ -117,6 +145,9 @@ class Slip {
     String? authorId,
     String? authorUsername,
     bool? isPublic,
+    PostType? postType,
+    String? title,
+    bool? isResolved,
     String? topic,
     String? subtopic,
     String? examTag,
@@ -142,12 +173,31 @@ class Slip {
       authorId: authorId ?? this.authorId,
       authorUsername: authorUsername ?? this.authorUsername,
       isPublic: isPublic ?? this.isPublic,
+      postType: postType ?? this.postType,
+      title: title ?? this.title,
+      isResolved: isResolved ?? this.isResolved,
       topic: topic ?? this.topic,
       subtopic: subtopic ?? this.subtopic,
       examTag: examTag ?? this.examTag,
       trapStatement: trapStatement ?? this.trapStatement,
       fixStatement: fixStatement ?? this.fixStatement,
       imageUris: imageUris ?? this.imageUris,
+      scratchpadImageUrl: scratchpadImageUrl ?? this.scratchpadImageUrl,
+      voiceAudioUrl: voiceAudioUrl ?? this.voiceAudioUrl,
+      whiteboardVideoUrl: whiteboardVideoUrl ?? this.whiteboardVideoUrl,
+      audioDurationSeconds: audioDurationSeconds ?? this.audioDurationSeconds,
+      sameCount: sameCount ?? this.sameCount,
+      clearedCount: clearedCount ?? this.clearedCount,
+      keepCount: keepCount ?? this.keepCount,
+      createdAt: createdAt ?? this.createdAt,
+      hasSaidSame: hasSaidSame ?? this.hasSaidSame,
+      hasKept: hasKept ?? this.hasKept,
+      hasCleared: hasCleared ?? this.hasCleared,
+      isFixRevealed: isFixRevealed ?? this.isFixRevealed,
+      allowComments: allowComments ?? this.allowComments,
+    );
+  }
+}
       scratchpadImageUrl: scratchpadImageUrl ?? this.scratchpadImageUrl,
       voiceAudioUrl: voiceAudioUrl ?? this.voiceAudioUrl,
       whiteboardVideoUrl: whiteboardVideoUrl ?? this.whiteboardVideoUrl,

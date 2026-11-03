@@ -35,7 +35,8 @@ class _SlipCardState extends State<SlipCard> {
   @override
   Widget build(BuildContext context) {
     final slip = widget.slip;
-    final examShort = slip.examTag.replaceAll('GATE ', '').replaceAll(' 2027', '');
+    final isDoubt = slip.postType == PostType.doubt;
+    final examShort = slip.examTag.replaceAll('GATE ', '').replaceAll(RegExp(r'\s*\d{4}'), '');
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -47,7 +48,7 @@ class _SlipCardState extends State<SlipCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Author Handle, Private Badge & Exam Tag
+          // 1. Author Handle, Post Type Badges & Exam Tag
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -92,30 +93,101 @@ class _SlipCardState extends State<SlipCard> {
                       ],
                     ),
                   ),
-                  if (!slip.isPublic) ...[
-                    const SizedBox(width: 6),
+
+                  const SizedBox(width: 6),
+
+                  // Post Type Badge
+                  if (isDoubt) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: SlipTheme.carbon,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                      child: const Text(
+                        'DOUBT',
+                        style: TextStyle(
+                          fontSize: 7.5,
+                          fontWeight: FontWeight.w800,
+                          color: SlipTheme.canvas,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
                       decoration: BoxDecoration(
-                        color: SlipTheme.hairline,
+                        color: slip.isResolved
+                            ? SlipTheme.clearedGreen.withOpacity(0.12)
+                            : SlipTheme.surface,
                         borderRadius: BorderRadius.circular(2),
+                        border: Border.all(
+                          color: slip.isResolved ? SlipTheme.clearedGreen : SlipTheme.hairline,
+                          width: 0.6,
+                        ),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.lock_outline_rounded, size: 9, color: SlipTheme.steel),
-                          SizedBox(width: 2),
+                          if (slip.isResolved) ...[
+                            const Icon(Icons.check_rounded, size: 8.5, color: SlipTheme.clearedGreen),
+                            const SizedBox(width: 2),
+                          ],
                           Text(
-                            'PRIVATE',
+                            slip.isResolved ? 'RESOLVED' : 'OPEN',
                             style: TextStyle(
                               fontSize: 7.5,
-                              fontWeight: FontWeight.w700,
-                              color: SlipTheme.steel,
+                              fontWeight: FontWeight.w800,
+                              color: slip.isResolved ? SlipTheme.clearedGreen : SlipTheme.steel,
                             ),
                           ),
                         ],
                       ),
                     ),
+                  ] else ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: SlipTheme.surface,
+                        borderRadius: BorderRadius.circular(2),
+                        border: Border.all(color: SlipTheme.hairline, width: 0.6),
+                      ),
+                      child: const Text(
+                        'MISTAKE',
+                        style: TextStyle(
+                          fontSize: 7.5,
+                          fontWeight: FontWeight.w800,
+                          color: SlipTheme.carbon,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ),
+                    if (!slip.isPublic) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: SlipTheme.hairline,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.lock_outline_rounded, size: 8.5, color: SlipTheme.steel),
+                            SizedBox(width: 2),
+                            Text(
+                              'PRIVATE',
+                              style: TextStyle(
+                                fontSize: 7.5,
+                                fontWeight: FontWeight.w700,
+                                color: SlipTheme.steel,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ],
               ),
@@ -150,19 +222,41 @@ class _SlipCardState extends State<SlipCard> {
           ),
           const SizedBox(height: 10),
 
-          // 2. The Trap Blunder Statement
-          Text(
-            slip.trapStatement,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: SlipTheme.carbon,
-                  height: 1.4,
-                  fontSize: 15,
-                ),
-          ),
+          // 2. The Question Title or Blunder Statement
+          if (isDoubt && slip.title != null && slip.title!.isNotEmpty) ...[
+            Text(
+              slip.title!,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: SlipTheme.carbon,
+                    height: 1.35,
+                    fontSize: 15.5,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              slip.trapStatement,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: SlipTheme.carbon.withOpacity(0.85),
+                    height: 1.45,
+                    fontSize: 13.5,
+                  ),
+            ),
+          ] else ...[
+            Text(
+              slip.trapStatement,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: SlipTheme.carbon,
+                    height: 1.4,
+                    fontSize: 15,
+                  ),
+            ),
+          ],
 
           // 3. Multi-image LinkedIn-Style Gallery Grid
           if (slip.imageUris.isNotEmpty) ...[
+            const SizedBox(height: 10),
             ImageGalleryGrid(imageUris: slip.imageUris),
           ],
 
@@ -171,14 +265,16 @@ class _SlipCardState extends State<SlipCard> {
             const SizedBox(height: 10),
             AudioWaveformStrip(
               totalSeconds: slip.audioDurationSeconds,
-              studentTranscript: 'Audio blunder note (${slip.audioDurationSeconds}s)',
+              studentTranscript: isDoubt
+                  ? 'Voice explanation (${slip.audioDurationSeconds}s)'
+                  : 'Audio blunder note (${slip.audioDurationSeconds}s)',
             ),
           ],
 
           const SizedBox(height: 12),
 
-          // 5. The Fix (Expandable & Clean)
-          if (slip.isFixRevealed) ...[
+          // 5. The Fix / Solution (Expandable & Clean)
+          if (slip.fixStatement.isNotEmpty && slip.isFixRevealed) ...[
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -193,7 +289,7 @@ class _SlipCardState extends State<SlipCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'THE FIX',
+                    isDoubt ? 'VERIFIED EXPLANATION / SOLUTION' : 'THE FIX',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: SlipTheme.clearedGreen,
                           fontWeight: FontWeight.w700,
@@ -215,31 +311,36 @@ class _SlipCardState extends State<SlipCard> {
             const SizedBox(height: 10),
           ],
 
-          // 6. Instagram-Style Clean Minimalist Action Row
+          // 6. Action Row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               // Reveal / Hide Fix text button
-              InkWell(
-                onTap: widget.onFixToggle,
-                borderRadius: BorderRadius.circular(2),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-                  child: Text(
-                    slip.isFixRevealed ? 'Hide fix' : 'Reveal fix',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: SlipTheme.carbon,
-                          fontWeight: FontWeight.w600,
-                          decoration: TextDecoration.underline,
-                        ),
+              if (slip.fixStatement.isNotEmpty)
+                InkWell(
+                  onTap: widget.onFixToggle,
+                  borderRadius: BorderRadius.circular(2),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                    child: Text(
+                      slip.isFixRevealed
+                          ? (isDoubt ? 'Hide solution' : 'Hide fix')
+                          : (isDoubt ? 'Reveal solution' : 'Reveal fix'),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: SlipTheme.carbon,
+                            fontWeight: FontWeight.w600,
+                            decoration: TextDecoration.underline,
+                          ),
+                    ),
                   ),
-                ),
-              ),
+                )
+              else
+                const SizedBox.shrink(),
 
               // Instagram-style clean icons row
               Row(
                 children: [
-                  // Same Reaction ("I fell for this too")
+                  // Same Reaction ("I have this doubt / fell for this too")
                   InkWell(
                     onTap: widget.onSameTap,
                     borderRadius: BorderRadius.circular(2),
@@ -248,9 +349,9 @@ class _SlipCardState extends State<SlipCard> {
                       child: Row(
                         children: [
                           Icon(
-                            slip.hasSaidSame
-                                ? Icons.warning_rounded
-                                : Icons.warning_amber_rounded,
+                            isDoubt
+                                ? (slip.hasSaidSame ? Icons.help_rounded : Icons.help_outline_rounded)
+                                : (slip.hasSaidSame ? Icons.warning_rounded : Icons.warning_amber_rounded),
                             size: 17,
                             color: slip.hasSaidSame
                                 ? SlipTheme.trapRed
@@ -292,35 +393,37 @@ class _SlipCardState extends State<SlipCard> {
                     ),
                   ),
 
-                  // Solve / Mastered Checkmark Icon
+                  // Solve / Mastered / Resolved Checkmark Icon
                   InkWell(
                     onTap: widget.onSolveTap,
                     borderRadius: BorderRadius.circular(2),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                       child: Icon(
-                        slip.hasCleared
+                        (isDoubt ? slip.isResolved : slip.hasCleared)
                             ? Icons.check_circle_rounded
                             : Icons.check_circle_outline_rounded,
                         size: 17,
-                        color: slip.hasCleared
+                        color: (isDoubt ? slip.isResolved : slip.hasCleared)
                             ? SlipTheme.clearedGreen
                             : SlipTheme.steel,
                       ),
                     ),
                   ),
 
-                  // Comment Toggle (Chat Bubble)
+                  // Comment / Answer Toggle (Chat Bubble)
                   InkWell(
                     onTap: () {
                       if (!slip.allowComments) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
+                          SnackBar(
                             content: Text(
-                              'Comments are turned off by the author for this blunder.',
-                              style: TextStyle(fontSize: 12),
+                              isDoubt
+                                  ? 'Answers are turned off by author for this doubt.'
+                                  : 'Comments are turned off by author for this blunder.',
+                              style: const TextStyle(fontSize: 12),
                             ),
-                            duration: Duration(seconds: 2),
+                            duration: const Duration(seconds: 2),
                           ),
                         );
                         return;
@@ -362,7 +465,12 @@ class _SlipCardState extends State<SlipCard> {
             ],
           ),
 
-          // 7. Toggleable Inline Comments Sheet
+          // 7. Toggleable Inline Comments / Answers Sheet
+          if (_showComments) ...[
+            CommentThreadSheet(slipId: slip.id),
+          ],
+        ],
+      ),
           if (_showComments) ...[
             CommentThreadSheet(slipId: slip.id),
           ],

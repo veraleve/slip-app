@@ -190,8 +190,8 @@ class _StreamScreenState extends State<StreamScreen>
                   );
                 },
                 tabs: [
-                  Tab(text: 'MY REVIEW CYCLE (${activeCycleSlips.length})'),
-                  const Tab(text: 'PEER BLUNDER FEED'),
+                  const Tab(text: 'PEER DOUBTS & Q&A'),
+                  Tab(text: 'MY MISTAKES & REVISION (${activeCycleSlips.length})'),
                 ],
               ),
             ),
@@ -225,9 +225,9 @@ class _StreamScreenState extends State<StreamScreen>
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     children: [
-                      // Filter Icon Button (opens full syllabus subjects sheet)
+                      // Filter Icon Button (opens cascading syllabus filter sheet)
                       GestureDetector(
-                        onTap: () => _showTopicFilterSheet(context, allSubjects),
+                        onTap: () => _showTopicFilterSheet(context, currentExam, allSubjects),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           margin: const EdgeInsets.only(right: 6),
@@ -314,11 +314,11 @@ class _StreamScreenState extends State<StreamScreen>
                   _tabController.animateTo(index);
                 },
                 children: [
-                  // --- TAB 1: MY REVIEW CYCLE ---
-                  _buildReviewCycleTab(activeCycleSlips, solvedSlips),
+                  // --- TAB 1: PEER DOUBTS & Q&A ---
+                  _buildPeerFeedTab(provider.slips.where((s) => s.isPublic).toList()),
 
-                  // --- TAB 2: PEER BLUNDER FEED ---
-                  _buildPeerFeedTab(provider.slips),
+                  // --- TAB 2: MY MISTAKES & REVISION ---
+                  _buildReviewCycleTab(activeCycleSlips, solvedSlips),
                 ],
               ),
             ),
@@ -746,128 +746,250 @@ class _StreamScreenState extends State<StreamScreen>
       },
     );
   }
-  void _showTopicFilterSheet(BuildContext context, List<String> allSubjects) {
+  void _showTopicFilterSheet(BuildContext context, String currentExam, List<String> allSubjects) {
+    String tempSubject = widget.provider.selectedSubjectFilter;
+    String tempTopic = widget.provider.selectedSubtopicFilter;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: SlipTheme.canvas,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
       ),
       builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return StatefulBuilder(
+          builder: (dialogCtx, setSheetState) {
+            final availableSubtopics = tempSubject != 'All'
+                ? GateSyllabus.getSubtopics(currentExam, tempSubject)
+                : <String>[];
+
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 16,
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'CASCADING SYLLABUS FILTERS',
+                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.6,
+                                color: SlipTheme.carbon,
+                              ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 20),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(color: SlipTheme.hairline, height: 1),
+                    const SizedBox(height: 14),
+
+                    // Quick Presets
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              widget.provider.resetCascadingFilters();
+                              Navigator.of(ctx).pop();
+                            },
+                            icon: const Icon(Icons.bolt_rounded, size: 14),
+                            label: const Text('FOR YOU (REC)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: widget.provider.selectedTopicFilter == 'For You'
+                                  ? SlipTheme.carbon
+                                  : SlipTheme.steel,
+                              side: BorderSide(
+                                color: widget.provider.selectedTopicFilter == 'For You'
+                                    ? SlipTheme.carbon
+                                    : SlipTheme.hairline,
+                                width: 0.8,
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              widget.provider.setTopicFilter('All');
+                              widget.provider.setSubjectFilter('All');
+                              widget.provider.setSubtopicFilter('All Topics');
+                              Navigator.of(ctx).pop();
+                            },
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: (widget.provider.selectedTopicFilter == 'All' &&
+                                      widget.provider.selectedSubjectFilter == 'All')
+                                  ? SlipTheme.carbon
+                                  : SlipTheme.steel,
+                              side: BorderSide(
+                                color: (widget.provider.selectedTopicFilter == 'All' &&
+                                        widget.provider.selectedSubjectFilter == 'All')
+                                    ? SlipTheme.carbon
+                                    : SlipTheme.hairline,
+                                width: 0.8,
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                            ),
+                            child: const Text('SHOW ALL', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Cascading Selector 1: Subject Dropdown
                     Text(
-                      'SYLLABUS SUBJECT FILTERS',
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.6,
-                            color: SlipTheme.carbon,
+                      'SUBJECT',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: SlipTheme.steel,
+                            fontSize: 9.5,
                           ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 20),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: () => Navigator.of(ctx).pop(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                const Divider(color: SlipTheme.hairline, height: 1),
-                const SizedBox(height: 6),
-
-                // Special presets: 'For You' and 'All'
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          widget.provider.setTopicFilter('For You');
-                          Navigator.of(ctx).pop();
-                        },
-                        icon: const Icon(Icons.bolt_rounded, size: 14),
-                        label: const Text('FOR YOU (AI REC)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: widget.provider.selectedTopicFilter == 'For You'
-                              ? SlipTheme.carbon
-                              : SlipTheme.steel,
-                          side: BorderSide(
-                            color: widget.provider.selectedTopicFilter == 'For You'
-                                ? SlipTheme.carbon
-                                : SlipTheme.hairline,
-                            width: 0.8,
-                          ),
-                        ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: SlipTheme.hairline, width: 0.8),
+                        borderRadius: BorderRadius.circular(2),
+                        color: SlipTheme.surface,
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          widget.provider.setTopicFilter('All');
-                          Navigator.of(ctx).pop();
-                        },
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: widget.provider.selectedTopicFilter == 'All'
-                              ? SlipTheme.carbon
-                              : SlipTheme.steel,
-                          side: BorderSide(
-                            color: widget.provider.selectedTopicFilter == 'All'
-                                ? SlipTheme.carbon
-                                : SlipTheme.hairline,
-                            width: 0.8,
-                          ),
-                        ),
-                        child: const Text('ALL TOPICS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-
-                Expanded(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: allSubjects.length,
-                    separatorBuilder: (_, __) =>
-                        const Divider(color: SlipTheme.hairline, height: 1),
-                    itemBuilder: (context, i) {
-                      final subj = allSubjects[i];
-                      final isSelected = widget.provider.selectedTopicFilter == subj;
-
-                      return ListTile(
-                        dense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                        title: Text(
-                          subj,
-                          style: TextStyle(
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: tempSubject,
+                          isExpanded: true,
+                          style: const TextStyle(
                             fontSize: 12.5,
-                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                            color: isSelected ? SlipTheme.carbon : SlipTheme.steel,
+                            color: SlipTheme.carbon,
+                            fontWeight: FontWeight.w600,
                           ),
+                          items: [
+                            const DropdownMenuItem(
+                              value: 'All',
+                              child: Text('All Subjects', overflow: TextOverflow.ellipsis),
+                            ),
+                            ...allSubjects.map((s) {
+                              return DropdownMenuItem(
+                                value: s,
+                                child: Text(s, overflow: TextOverflow.ellipsis),
+                              );
+                            }),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setSheetState(() {
+                                tempSubject = val;
+                                tempTopic = 'All Topics';
+                              });
+                            }
+                          },
                         ),
-                        trailing: isSelected
-                            ? const Icon(Icons.check_rounded, size: 16, color: SlipTheme.carbon)
-                            : null,
-                        onTap: () {
-                          widget.provider.setTopicFilter(subj);
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Cascading Selector 2: Topic Dropdown
+                    Text(
+                      'TOPIC / CONCEPT',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: SlipTheme.steel,
+                            fontSize: 9.5,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: SlipTheme.hairline, width: 0.8),
+                        borderRadius: BorderRadius.circular(2),
+                        color: SlipTheme.surface,
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: tempTopic,
+                          isExpanded: true,
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            color: SlipTheme.carbon,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          items: [
+                            const DropdownMenuItem(
+                              value: 'All Topics',
+                              child: Text('All Topics', overflow: TextOverflow.ellipsis),
+                            ),
+                            ...availableSubtopics.map((t) {
+                              return DropdownMenuItem(
+                                value: t,
+                                child: Text(t, overflow: TextOverflow.ellipsis),
+                              );
+                            }),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setSheetState(() {
+                                tempTopic = val;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Apply Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 42,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          if (tempSubject == 'All') {
+                            widget.provider.setTopicFilter('All');
+                            widget.provider.setSubjectFilter('All');
+                            widget.provider.setSubtopicFilter('All Topics');
+                          } else {
+                            widget.provider.setSubjectFilter(tempSubject);
+                            widget.provider.setSubtopicFilter(tempTopic);
+                          }
                           Navigator.of(ctx).pop();
                         },
-                      );
-                    },
-                  ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: SlipTheme.carbon,
+                          foregroundColor: SlipTheme.canvas,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                        child: const Text(
+                          'APPLY FILTERS',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.6),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );

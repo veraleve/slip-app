@@ -36,6 +36,28 @@ void main() {
           contains('det(A)=0 implies all eigenvalues are 0'));
     });
 
+    test('Slip supports Doubt postType with title and resolution flag', () {
+      final now = DateTime.now();
+      final doubt = Slip(
+        id: 'slip-doubt-1',
+        postType: PostType.doubt,
+        title: 'Why is L1 cache VIPT?',
+        topic: 'Computer Organization & Architecture',
+        subtopic: 'Memory Hierarchy & Cache Mapping',
+        trapStatement: 'Is aliasing prevented when cache size <= page size?',
+        fixStatement: 'Yes, because index bits fit inside page offset.',
+        isResolved: true,
+        createdAt: now,
+      );
+
+      final json = doubt.toJson();
+      final reconstructed = Slip.fromJson(json);
+
+      expect(reconstructed.postType, equals(PostType.doubt));
+      expect(reconstructed.title, equals('Why is L1 cache VIPT?'));
+      expect(reconstructed.isResolved, isTrue);
+    });
+
     test('Slip copyWith maintains immutability and updates flags', () {
       final slip = Slip(
         id: 'slip-test-2',

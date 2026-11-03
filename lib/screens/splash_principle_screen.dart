@@ -112,28 +112,18 @@ class _SplashPrincipleScreenState extends State<SplashPrincipleScreen>
                           ),
                     ),
 
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 24),
 
                     // Minimalist Core Principle
                     Text(
-                      '“Learn from others’ mistakes too.”',
+                      'Ask doubts. Learn from others’ mistakes.\nMaster the concepts together before the exam.',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w600,
                             color: SlipTheme.carbon,
-                            fontSize: 18,
-                            height: 1.35,
+                            fontSize: 16.5,
+                            height: 1.5,
                             letterSpacing: -0.2,
-                          ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'You won\'t have time to make them all yourself before the exam.',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: SlipTheme.steel,
-                            fontSize: 13.5,
-                            height: 1.45,
                           ),
                     ),
 
@@ -141,24 +131,13 @@ class _SplashPrincipleScreenState extends State<SplashPrincipleScreen>
 
                     // Subtle Centered Footer
                     Text(
-                      'GATE · MISTAKE INOCULATION NETWORK',
+                      'PEER LEARNING & INOCULATION NETWORK',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                             color: SlipTheme.steel,
                             fontSize: 9.5,
                             letterSpacing: 1.2,
                             fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'OFFLINE BLE MESH · PEER LEARNING',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: SlipTheme.steelLight,
-                            fontSize: 8.5,
-                            letterSpacing: 1.0,
-                            fontWeight: FontWeight.w600,
                           ),
                     ),
                     const SizedBox(height: 20),

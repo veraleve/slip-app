@@ -12,14 +12,25 @@ class SlipProvider extends ChangeNotifier {
   int _activeTabIndex = 0;
   String _selectedExamFilter = 'All';
   String _selectedTopicFilter = 'For You';
+  String _selectedSubjectFilter = 'All';
+  String _selectedSubtopicFilter = 'All Topics';
 
   List<Slip> get slips {
     var result = _slips;
     if (_selectedExamFilter != 'All') {
       result = result.where((s) => s.examTag == _selectedExamFilter).toList();
     }
+
+    if (_selectedSubjectFilter != 'All') {
+      result = result.where((s) => s.topic == _selectedSubjectFilter).toList();
+    }
+
+    if (_selectedSubtopicFilter != 'All Topics') {
+      result = result.where((s) => s.subtopic == _selectedSubtopicFilter).toList();
+    }
+
     if (_selectedTopicFilter == 'For You') {
-      // Prioritize recommended peer blunders (unmastered, high sameCount, recent)
+      // Prioritize recommended peer blunders & doubts (unmastered, high sameCount, recent)
       final recs = List<Slip>.from(result);
       recs.sort((a, b) {
         final aScore = (a.sameCount * 2) + (a.keepCount * 3) - (a.hasCleared ? 10 : 0);
@@ -27,7 +38,7 @@ class SlipProvider extends ChangeNotifier {
         return bScore.compareTo(aScore);
       });
       return recs;
-    } else if (_selectedTopicFilter != 'All') {
+    } else if (_selectedTopicFilter != 'All' && _selectedSubjectFilter == 'All') {
       result = result.where((s) => s.topic == _selectedTopicFilter).toList();
     }
     return result;
@@ -39,6 +50,8 @@ class SlipProvider extends ChangeNotifier {
   int get activeTabIndex => _activeTabIndex;
   String get selectedExamFilter => _selectedExamFilter;
   String get selectedTopicFilter => _selectedTopicFilter;
+  String get selectedSubjectFilter => _selectedSubjectFilter;
+  String get selectedSubtopicFilter => _selectedSubtopicFilter;
   List<String> get userExams => _service.targetExams;
 
   // Counts for profile
@@ -133,11 +146,32 @@ class SlipProvider extends ChangeNotifier {
   void setExamFilter(String exam) {
     _selectedExamFilter = exam;
     _selectedTopicFilter = 'For You'; // Reset topic filter to recommendation on exam switch
+    _selectedSubjectFilter = 'All';
+    _selectedSubtopicFilter = 'All Topics';
     notifyListeners();
   }
 
   void setTopicFilter(String topic) {
     _selectedTopicFilter = topic;
+    notifyListeners();
+  }
+
+  void setSubjectFilter(String subject) {
+    _selectedSubjectFilter = subject;
+    _selectedSubtopicFilter = 'All Topics';
+    _selectedTopicFilter = subject;
+    notifyListeners();
+  }
+
+  void setSubtopicFilter(String subtopic) {
+    _selectedSubtopicFilter = subtopic;
+    notifyListeners();
+  }
+
+  void resetCascadingFilters() {
+    _selectedSubjectFilter = 'All';
+    _selectedSubtopicFilter = 'All Topics';
+    _selectedTopicFilter = 'For You';
     notifyListeners();
   }
 
@@ -216,23 +250,43 @@ class SlipProvider extends ChangeNotifier {
     }
   }
 
-  // 5. Submit new slip (Public or Private)
+  // 4b. Toggle Doubt Resolved Status
+  void toggleDoubtResolved(String slipId) {
+    final index = _slips.indexWhere((s) => s.id == slipId);
+    if (index == -1) return;
+
+    final current = _slips[index];
+    final newState = !current.isResolved;
+
+    _slips[index] = current.copyWith(isResolved: newState);
+    notifyListeners();
+
+    _service.toggleDoubtResolved(slipId, newState);
+  }
+
+  // 5. Submit new slip (Doubt or Mistake, Public or Private)
   Future<bool> dropSlip({
     required String examTag,
     required String topic,
     required String subtopic,
     required String trapStatement,
-    required String fixStatement,
+    String fixStatement = '',
+    PostType postType = PostType.doubt,
+    String? title,
+    bool isResolved = false,
     List<String> imageUris = const [],
     int audioDurationSeconds = 0,
     bool allowComments = true,
     bool isPublic = true,
   }) async {
     final newSlip = Slip(
-      id: 'slip-${DateTime.now().millisecondsSinceEpoch}',
+      id: SupabaseService.generateUuid(),
       examTag: examTag,
       topic: topic,
       subtopic: subtopic,
+      postType: postType,
+      title: title,
+      isResolved: isResolved,
       trapStatement: trapStatement,
       fixStatement: fixStatement,
       imageUris: imageUris,
