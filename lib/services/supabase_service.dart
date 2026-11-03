@@ -409,6 +409,8 @@ class SupabaseService {
     final savedPeerSlips = await loadSavedPeerSlips();
     final cachedFeed = await loadCachedFeed();
     final savedIds = await getSavedSlipIds();
+    final prefs = await SharedPreferences.getInstance();
+    final deletedIds = (prefs.getStringList('slip_deleted_ids') ?? []).toSet();
 
     final Map<String, Slip> combinedMap = {};
     for (final s in cachedFeed) {
@@ -428,37 +430,15 @@ class SupabaseService {
       }
     }
 
-    // 2. High-Efficiency Delta Sync: Query ONLY new records created after our latest cached item
+    // 2. Fetch fresh records from Supabase cloud
     if (_client != null) {
       try {
-        DateTime? latestCachedCreatedAt;
-        if (cachedFeed.isNotEmpty) {
-          for (final s in cachedFeed) {
-            if (latestCachedCreatedAt == null || s.createdAt.isAfter(latestCachedCreatedAt)) {
-              latestCachedCreatedAt = s.createdAt;
-            }
-          }
-        }
-
-        List<dynamic> list = [];
-        if (latestCachedCreatedAt != null) {
-          // Delta sync: fetch ONLY rows newer than our newest cached post
-          final response = await _client!
-              .from('slips')
-              .select()
-              .gt('created_at', latestCachedCreatedAt.toUtc().toIso8601String())
-              .order('created_at', ascending: false)
-              .limit(50);
-          list = response as List;
-        } else {
-          // Initial cold load: fetch the first page of 25 records
-          final response = await _client!
-              .from('slips')
-              .select()
-              .order('created_at', ascending: false)
-              .limit(25);
-          list = response as List;
-        }
+        final response = await _client!
+            .from('slips')
+            .select()
+            .order('created_at', ascending: false)
+            .limit(50);
+        final list = response as List;
 
         if (list.isNotEmpty) {
           for (final item in list) {
@@ -492,7 +472,7 @@ class SupabaseService {
     }
 
     // 3. Filter and Sort by createdAt descending (newest posts at top)
-    var result = combinedMap.values.toList();
+    var result = combinedMap.values.where((s) => !deletedIds.contains(s.id)).toList();
     result.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     // Flexible Paper Filter using normalization so peer doubts are never lost
@@ -527,6 +507,8 @@ class SupabaseService {
     if (_client == null) return [];
     try {
       final savedIds = await getSavedSlipIds();
+    final prefs = await SharedPreferences.getInstance();
+    final deletedIds = (prefs.getStringList('slip_deleted_ids') ?? []).toSet();
       final response = await _client!
           .from('slips')
           .select()
@@ -536,10 +518,13 @@ class SupabaseService {
       final list = response as List;
 
       if (list.isNotEmpty) {
-        final olderSlips = list.map((item) {
-          final slip = Slip.fromJson(item as Map<String, dynamic>);
-          return slip.copyWith(hasKept: savedIds.contains(slip.id));
-        }).toList();
+        final olderSlips = list
+            .map((item) {
+              final slip = Slip.fromJson(item as Map<String, dynamic>);
+              return slip.copyWith(hasKept: savedIds.contains(slip.id));
+            })
+            .where((s) => !deletedIds.contains(s.id))
+            .toList();
 
         // Append to cached feed
         final cached = await loadCachedFeed();
@@ -571,15 +556,18 @@ class SupabaseService {
     } catch (_) {}
   }
 
-  Future<String?> uploadImageFile(String localPath) async {
+  Future<String?> uploadMediaFile(String localPath, {required bool isAudio}) async {
     if (_client == null) return null;
     try {
       final file = File(localPath);
       if (!await file.exists()) return null;
       final bytes = await file.readAsBytes();
       final ext = localPath.split('.').last.toLowerCase();
-      final mime = (ext == 'png') ? 'image/png' : 'image/jpeg';
-      final fileName = 'slip_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(9999)}.$ext';
+      final mime = isAudio
+          ? (ext == 'm4a' ? 'audio/m4a' : 'audio/mp4')
+          : (ext == 'png' ? 'image/png' : 'image/jpeg');
+      final prefix = isAudio ? 'audio' : 'slip';
+      final fileName = '${prefix}_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(9999)}.$ext';
 
       await _client!.storage.from('slip_media').uploadBinary(
         fileName,
@@ -589,27 +577,20 @@ class SupabaseService {
       final publicUrl = _client!.storage.from('slip_media').getPublicUrl(fileName);
       return publicUrl;
     } catch (e) {
-      debugPrint('Error uploading slip image: $e');
+      debugPrint('Error uploading media: $e');
       return null;
     }
   }
 
   Future<bool> submitSlip(Slip slip) async {
-    // 1. Immediately cache locally for offline access
-    final local = await loadLocalUserSlips();
-    local.removeWhere((s) => s.id == slip.id);
-    local.insert(0, slip);
-    await saveLocalUserSlips(local);
-
-    // Also insert into cached public feed if public
-    if (slip.isPublic) {
-      final cached = await loadCachedFeed();
-      cached.removeWhere((s) => s.id == slip.id);
-      cached.insert(0, slip);
-      await saveCachedFeed(cached);
+    if (_client == null) {
+      final local = await loadLocalUserSlips();
+      local.removeWhere((s) => s.id == slip.id);
+      local.insert(0, slip);
+      await saveLocalUserSlips(local);
+      return true;
     }
 
-    if (_client == null) return true;
     try {
       final validAuthorId = (slip.authorId != null && isUuid(slip.authorId!))
           ? slip.authorId!
@@ -621,31 +602,64 @@ class SupabaseService {
         if (firstImg.startsWith('http://') || firstImg.startsWith('https://')) {
           imageUrl = firstImg;
         } else {
-          imageUrl = await uploadImageFile(firstImg);
+          imageUrl = await uploadMediaFile(firstImg, isAudio: false);
         }
       }
 
+      String? voiceUrl;
+      if (slip.voiceAudioUrl != null && slip.voiceAudioUrl!.isNotEmpty) {
+        final audioPath = slip.voiceAudioUrl!;
+        if (audioPath.startsWith('http://') || audioPath.startsWith('https://')) {
+          voiceUrl = audioPath;
+        } else {
+          voiceUrl = await uploadMediaFile(audioPath, isAudio: true);
+        }
+      }
+
+      final resolvedSlip = slip.copyWith(
+        imageUris: imageUrl != null ? [imageUrl] : slip.imageUris,
+        voiceAudioUrl: voiceUrl ?? slip.voiceAudioUrl,
+      );
+
+      // Save locally with cloud URLs
+      final local = await loadLocalUserSlips();
+      local.removeWhere((s) => s.id == resolvedSlip.id);
+      local.insert(0, resolvedSlip);
+      await saveLocalUserSlips(local);
+
+      if (resolvedSlip.isPublic) {
+        final cached = await loadCachedFeed();
+        cached.removeWhere((s) => s.id == resolvedSlip.id);
+        cached.insert(0, resolvedSlip);
+        await saveCachedFeed(cached);
+      }
+
       await _client!.from('slips').insert({
-        'id': slip.id,
-        'topic': slip.topic.isNotEmpty ? slip.topic : 'General',
-        'subtopic': (slip.subtopic != null && slip.subtopic!.isNotEmpty) ? slip.subtopic : 'General',
-        'exam_tag': (slip.examTag != null && slip.examTag!.isNotEmpty) ? slip.examTag : 'General',
-        'post_type': slip.postType.name,
-        'title': slip.title ?? '',
-        'is_resolved': slip.isResolved,
-        'is_public': slip.isPublic,
-        'trap_statement': slip.trapStatement.isNotEmpty ? slip.trapStatement : '',
-        'fix_statement': slip.fixStatement.isNotEmpty ? slip.fixStatement : '',
-        'scratchpad_image_url': imageUrl ?? (slip.imageUris.isNotEmpty ? slip.imageUris.first : null),
-        'voice_audio_url': slip.voiceAudioUrl,
+        'id': resolvedSlip.id,
+        'topic': resolvedSlip.topic.isNotEmpty ? resolvedSlip.topic : 'General',
+        'subtopic': (resolvedSlip.subtopic != null && resolvedSlip.subtopic!.isNotEmpty) ? resolvedSlip.subtopic : 'General',
+        'exam_tag': (resolvedSlip.examTag != null && resolvedSlip.examTag!.isNotEmpty) ? resolvedSlip.examTag : 'General',
+        'post_type': resolvedSlip.postType.name,
+        'title': resolvedSlip.title ?? '',
+        'is_resolved': resolvedSlip.isResolved,
+        'is_public': resolvedSlip.isPublic,
+        'trap_statement': resolvedSlip.trapStatement.isNotEmpty ? resolvedSlip.trapStatement : '',
+        'fix_statement': resolvedSlip.fixStatement.isNotEmpty ? resolvedSlip.fixStatement : '',
+        'scratchpad_image_url': imageUrl ?? (resolvedSlip.imageUris.isNotEmpty ? resolvedSlip.imageUris.first : null),
+        'voice_audio_url': voiceUrl ?? resolvedSlip.voiceAudioUrl,
         'author_id': validAuthorId,
-        'author_handle': slip.authorUsername ?? _currentUsername ?? 'peer',
-        'audio_duration_seconds': slip.audioDurationSeconds,
-        'created_at': slip.createdAt.toUtc().toIso8601String(),
+        'author_handle': resolvedSlip.authorUsername ?? _currentUsername ?? 'peer',
+        'audio_duration_seconds': resolvedSlip.audioDurationSeconds,
+        'created_at': resolvedSlip.createdAt.toUtc().toIso8601String(),
       });
       return true;
     } catch (e) {
       debugPrint('Submit slip to Supabase error: $e');
+      // Save locally as offline fallback
+      final local = await loadLocalUserSlips();
+      local.removeWhere((s) => s.id == slip.id);
+      local.insert(0, slip);
+      await saveLocalUserSlips(local);
       return false;
     }
   }
@@ -695,7 +709,7 @@ class SupabaseService {
         if (firstImg.startsWith('http://') || firstImg.startsWith('https://')) {
           imageUrl = firstImg;
         } else {
-          imageUrl = await uploadImageFile(firstImg);
+          imageUrl = await uploadMediaFile(firstImg, isAudio: false);
         }
       }
 
@@ -719,19 +733,38 @@ class SupabaseService {
   }
 
   Future<bool> deleteSlip(String slipId) async {
-    // 1. Immediately delete locally
+    // 1. Immediately delete locally from user slips
     final local = await loadLocalUserSlips();
     local.removeWhere((s) => s.id == slipId);
     await saveLocalUserSlips(local);
 
-    if (_client == null) return true;
+    // 2. Immediately delete from cached public feed
+    final cached = await loadCachedFeed();
+    cached.removeWhere((s) => s.id == slipId);
+    await saveCachedFeed(cached);
+
+    // 3. Immediately delete from saved peer slips
+    final saved = await loadSavedPeerSlips();
+    saved.removeWhere((s) => s.id == slipId);
+    await saveSavedPeerSlips(saved);
+
+    // 4. Track locally deleted IDs so fresh sync or stale caches never resurrect them
     try {
-      await _client!.from('slips').delete().eq('id', slipId);
-      return true;
-    } catch (e) {
-      debugPrint('Submit slip to Supabase error: $e');
-      return false;
+      final prefs = await SharedPreferences.getInstance();
+      final deleted = (prefs.getStringList('slip_deleted_ids') ?? []).toSet();
+      deleted.add(slipId);
+      await prefs.setStringList('slip_deleted_ids', deleted.toList());
+    } catch (_) {}
+
+    // 5. Delete permanently from Supabase cloud
+    if (_client != null) {
+      try {
+        await _client!.from('slips').delete().eq('id', slipId);
+      } catch (e) {
+        debugPrint('Delete slip from Supabase error: $e');
+      }
     }
+    return true;
   }
 
   // --- 5. TASKS / MOCK TEST REMINDER STORAGE (OFFLINE-FIRST) ---

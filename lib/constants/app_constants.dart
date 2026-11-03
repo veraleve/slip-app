@@ -2,7 +2,7 @@ import 'gate_syllabus.dart';
 
 class AppConstants {
   static const String appName = 'SLIP';
-  static const String appVersion = 'v0.1.10';
+  static const String appVersion = 'v0.1.11';
   static const String tagline = 'PEER MISTAKE INOCULATION NETWORK';
 
   // Supabase Configuration (Injected via --dart-define or GitHub Secrets, with production fallback)

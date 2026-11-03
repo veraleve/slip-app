@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import '../constants/app_constants.dart';
 import 'native_device_service.dart';
 
 class AppReleaseInfo {
@@ -106,7 +107,7 @@ class AppUpdateProgress {
 }
 
 class AppUpdateService {
-  static const String currentVersion = '0.1.9';
+  static String get currentVersion => AppConstants.appVersion.replaceFirst(RegExp(r'^[vV]'), '');
   static const String githubRepo = 'veraleve/slip-app';
   static const String releaseApiUrl = 'https://api.github.com/repos/$githubRepo/releases/latest';
 

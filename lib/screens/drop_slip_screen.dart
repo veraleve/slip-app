@@ -159,6 +159,13 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
       _attachedImages.clear();
       _deleteVoiceNote();
       _isSubmitting = false;
+      _isGeneralDoubt = false;
+      final userExams = widget.provider.userExams;
+      _selectedExam = userExams.isNotEmpty ? userExams.first : GateSyllabus.gateCS;
+      final subjects = GateSyllabus.getSubjectsForExam(_selectedExam);
+      _selectedSubject = subjects.first;
+      final topics = GateSyllabus.getSubtopics(_selectedExam, _selectedSubject);
+      _selectedSubtopic = topics.isNotEmpty ? topics.first : 'General';
     });
   }
 
@@ -300,10 +307,15 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
 
     setState(() => _isSubmitting = true);
 
+    final isGeneral = _selectedExam == 'General' || _isGeneralDoubt;
+    final finalExam = isGeneral ? 'General' : _selectedExam;
+    final finalSubject = isGeneral ? 'General' : _selectedSubject;
+    final finalSubtopic = isGeneral ? 'General' : _selectedSubtopic;
+
     final success = await widget.provider.dropSlip(
-      examTag: _selectedExam,
-      topic: _selectedSubject,
-      subtopic: _selectedSubtopic,
+      examTag: finalExam,
+      topic: finalSubject,
+      subtopic: finalSubtopic,
       postType: _activeMode,
       title: isDoubt ? title : null,
       trapStatement: trap,
@@ -319,10 +331,14 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
 
     if (success && mounted) {
       NativeDeviceService.showNotification(
-        title: isDoubt ? 'Doubt Posted · $_selectedExam' : 'Blunder Logged · $_selectedExam',
+        title: isDoubt
+            ? (isGeneral ? 'General Doubt Posted' : 'Doubt Posted · $finalExam')
+            : 'Blunder Logged · $finalExam',
         body: isDoubt
-            ? 'Your question on "$_selectedSubject" is live for peer answers.'
-            : 'Your mistake on "$_selectedSubject" is recorded.',
+            ? (isGeneral
+                ? 'Your general question is live for peer answers.'
+                : 'Your question on "$finalSubject" is live for peer answers.')
+            : 'Your mistake on "$finalSubject" is recorded.',
       );
 
       _showSuccessConfirmationDialog();
@@ -331,18 +347,24 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final availableSubjects = GateSyllabus.getSubjectsForExam(_selectedExam);
-    final availableSubtopics = GateSyllabus.getSubtopics(_selectedExam, _selectedSubject);
+    final isGeneral = _selectedExam == 'General' || _isGeneralDoubt;
+    final availableSubjects = isGeneral ? const ['General'] : GateSyllabus.getSubjectsForExam(_selectedExam);
+    final availableSubtopics = isGeneral ? const ['General'] : GateSyllabus.getSubtopics(_selectedExam, _selectedSubject);
 
     // Ensure valid selections
-    if (!availableSubjects.contains(_selectedSubject)) {
-      _selectedSubject = availableSubjects.first;
-    }
-    final allSubtopicOptions = availableSubtopics.isNotEmpty
-        ? availableSubtopics
-        : ['General'];
-    if (!allSubtopicOptions.contains(_selectedSubtopic)) {
-      _selectedSubtopic = allSubtopicOptions.first;
+    if (isGeneral) {
+      _selectedSubject = 'General';
+      _selectedSubtopic = 'General';
+    } else {
+      if (!availableSubjects.contains(_selectedSubject)) {
+        _selectedSubject = availableSubjects.first;
+      }
+      final allSubtopicOptions = availableSubtopics.isNotEmpty
+          ? availableSubtopics
+          : ['General'];
+      if (!allSubtopicOptions.contains(_selectedSubtopic)) {
+        _selectedSubtopic = allSubtopicOptions.first;
+      }
     }
 
     final isDoubt = _activeMode == PostType.doubt;

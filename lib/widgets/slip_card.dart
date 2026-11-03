@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/slip.dart';
 import '../providers/slip_provider.dart';
 import '../screens/post_detail_screen.dart';
 import '../screens/profile_screen.dart';
+import '../services/supabase_service.dart';
 import '../theme/slip_theme.dart';
 import 'audio_waveform_strip.dart';
 import 'clickable_text.dart';
@@ -35,7 +38,54 @@ class SlipCard extends StatefulWidget {
   State<SlipCard> createState() => _SlipCardState();
 }
 
-class _SlipCardState extends State<SlipCard> {
+class _SlipCardState extends State<SlipCard> with TickerProviderStateMixin {
+  late AnimationController _bookmarkController;
+  late Animation<double> _bookmarkAnimation;
+  late AnimationController _solveController;
+  late Animation<double> _solveAnimation;
+  late AnimationController _sameController;
+  late Animation<double> _sameAnimation;
+  bool _showSameTooltip = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _bookmarkController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+    _bookmarkAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.4).chain(CurveTween(curve: Curves.easeOutBack)), weight: 50),
+      TweenSequenceItem(tween: Tween(begin: 1.4, end: 1.0).chain(CurveTween(curve: Curves.easeIn)), weight: 50),
+    ]).animate(_bookmarkController);
+
+    _solveController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _solveAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.45).chain(CurveTween(curve: Curves.easeOutBack)), weight: 50),
+      TweenSequenceItem(tween: Tween(begin: 1.45, end: 1.0).chain(CurveTween(curve: Curves.easeIn)), weight: 50),
+    ]).animate(_solveController);
+
+    _sameController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _sameAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.3).chain(CurveTween(curve: Curves.easeOutBack)), weight: 50),
+      TweenSequenceItem(tween: Tween(begin: 1.3, end: 1.0).chain(CurveTween(curve: Curves.easeIn)), weight: 50),
+    ]).animate(_sameController);
+  }
+
+  @override
+  void dispose() {
+    _bookmarkController.dispose();
+    _solveController.dispose();
+    _sameController.dispose();
+    super.dispose();
+  }
+
   String _formatInstagramTime(DateTime dt) {
     final diff = DateTime.now().difference(dt);
     if (diff.inSeconds < 60) {
@@ -60,6 +110,10 @@ class _SlipCardState extends State<SlipCard> {
     final isDoubt = slip.postType == PostType.doubt;
     final isGeneralDoubt = isDoubt && (slip.examTag == 'General' || slip.topic == 'General' || slip.subtopic == 'General');
     final examShort = slip.examTag.replaceAll('GATE ', '').replaceAll(RegExp(r'\s*\d{4}'), '');
+    final currentUsername = SupabaseService().currentUsername;
+    final isAuthor = currentUsername != null &&
+        slip.authorUsername != null &&
+        currentUsername.toLowerCase() == slip.authorUsername!.toLowerCase();
 
     return InkWell(
       onTap: () => _openPostDetail(context),
@@ -229,23 +283,64 @@ class _SlipCardState extends State<SlipCard> {
                   ],
                 ],
               ),
-              if (!isGeneralDoubt)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: SlipTheme.surface,
-                    borderRadius: BorderRadius.circular(2),
-                    border: Border.all(color: SlipTheme.hairline, width: 0.6),
-                  ),
-                  child: Text(
-                    examShort,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 9.5,
-                          color: SlipTheme.carbon,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!isGeneralDoubt)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: SlipTheme.surface,
+                        borderRadius: BorderRadius.circular(2),
+                        border: Border.all(color: SlipTheme.hairline, width: 0.6),
+                      ),
+                      child: Text(
+                        examShort,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 9.5,
+                              color: SlipTheme.carbon,
+                            ),
+                      ),
+                    ),
+                  if (isAuthor) ...[
+                    const SizedBox(width: 4),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_horiz_rounded, size: 18, color: SlipTheme.steel),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      elevation: 3,
+                      color: SlipTheme.canvas,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      onSelected: (val) {
+                        if (val == 'delete') {
+                          _confirmDelete(context);
+                        }
+                      },
+                      itemBuilder: (ctx) => [
+                        const PopupMenuItem(
+                          value: 'delete',
+                          height: 36,
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline_rounded, size: 16, color: SlipTheme.trapRed),
+                              SizedBox(width: 8),
+                              Text(
+                                'Delete Post',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: SlipTheme.trapRed,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                  ),
-                ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
           if (!isGeneralDoubt && slip.topic.isNotEmpty && slip.topic != 'General') ...[
@@ -362,40 +457,76 @@ class _SlipCardState extends State<SlipCard> {
               // LEFT: Question-mark / Warning Reaction, Comment, and Cleared Checkmark
               Row(
                 children: [
-                  // Reaction ("I have this doubt / fell for this too")
-                  InkWell(
-                    onTap: widget.onSameTap,
-                    borderRadius: BorderRadius.circular(14),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isDoubt
-                                ? (slip.hasSaidSame ? Icons.help_rounded : Icons.help_outline_rounded)
-                                : (slip.hasSaidSame ? Icons.warning_rounded : Icons.warning_amber_rounded),
-                            size: 18,
-                            color: slip.hasSaidSame
-                                ? (isDoubt ? SlipTheme.carbon : SlipTheme.trapRed)
-                                : SlipTheme.steel,
+                  // Reaction ("I have this doubt / fell for this too") with micro-pop and overlay pill
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      InkWell(
+                        onTap: _handleSameTap,
+                        borderRadius: BorderRadius.circular(14),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                          child: ScaleTransition(
+                            scale: _sameAnimation,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isDoubt
+                                      ? (slip.hasSaidSame ? Icons.help_rounded : Icons.help_outline_rounded)
+                                      : (slip.hasSaidSame ? Icons.warning_rounded : Icons.warning_amber_rounded),
+                                  size: 18,
+                                  color: slip.hasSaidSame
+                                      ? (isDoubt ? SlipTheme.carbon : SlipTheme.trapRed)
+                                      : SlipTheme.steel,
+                                ),
+                                if (slip.sameCount > 0) ...[
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${slip.sameCount}',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: slip.hasSaidSame
+                                          ? (isDoubt ? SlipTheme.carbon : SlipTheme.trapRed)
+                                          : SlipTheme.steel,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
-                          if (slip.sameCount > 0) ...[
-                            const SizedBox(width: 4),
-                            Text(
-                              '${slip.sameCount}',
-                              style: TextStyle(
-                                fontSize: 11.5,
+                        ),
+                      ),
+                      if (_showSameTooltip)
+                        Positioned(
+                          top: -24,
+                          left: 0,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: SlipTheme.carbon,
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.18),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              isDoubt ? '+1 Same doubt!' : '+1 Me too!',
+                              style: const TextStyle(
+                                fontSize: 9,
                                 fontWeight: FontWeight.w700,
-                                color: slip.hasSaidSame
-                                    ? (isDoubt ? SlipTheme.carbon : SlipTheme.trapRed)
-                                    : SlipTheme.steel,
+                                color: SlipTheme.canvas,
+                                letterSpacing: 0.2,
                               ),
                             ),
-                          ],
-                        ],
-                      ),
-                    ),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(width: 6),
 
@@ -414,20 +545,23 @@ class _SlipCardState extends State<SlipCard> {
                   ),
                   const SizedBox(width: 6),
 
-                  // Solved / Cleared / Mastered Checkmark Icon
+                  // Solved / Cleared / Mastered Checkmark Icon with burst animation
                   InkWell(
-                    onTap: widget.onSolveTap,
+                    onTap: _handleSolveTap,
                     borderRadius: BorderRadius.circular(14),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
-                      child: Icon(
-                        (isDoubt ? slip.isResolved : slip.hasCleared)
-                            ? Icons.check_circle_rounded
-                            : Icons.check_circle_outline_rounded,
-                        size: 18,
-                        color: (isDoubt ? slip.isResolved : slip.hasCleared)
-                            ? SlipTheme.clearedGreen
-                            : SlipTheme.steel,
+                      child: ScaleTransition(
+                        scale: _solveAnimation,
+                        child: Icon(
+                          (isDoubt ? slip.isResolved : slip.hasCleared)
+                              ? Icons.check_circle_rounded
+                              : Icons.check_circle_outline_rounded,
+                          size: 18,
+                          color: (isDoubt ? slip.isResolved : slip.hasCleared)
+                              ? SlipTheme.clearedGreen
+                              : SlipTheme.steel,
+                        ),
                       ),
                     ),
                   ),
@@ -457,20 +591,23 @@ class _SlipCardState extends State<SlipCard> {
                 ],
               ),
 
-              // RIGHT: Bookmark / Save to Revision
+              // RIGHT: Bookmark / Save to Revision (Instagram-style Pop)
               InkWell(
-                onTap: widget.onKeepTap,
+                onTap: _handleKeepTap,
                 borderRadius: BorderRadius.circular(14),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                  child: Icon(
-                    slip.hasKept
-                        ? Icons.bookmark_rounded
-                        : Icons.bookmark_border_rounded,
-                    size: 19,
-                    color: slip.hasKept
-                        ? SlipTheme.carbon
-                        : SlipTheme.steel,
+                  child: ScaleTransition(
+                    scale: _bookmarkAnimation,
+                    child: Icon(
+                      slip.hasKept
+                          ? Icons.bookmark_rounded
+                          : Icons.bookmark_border_rounded,
+                      size: 19,
+                      color: slip.hasKept
+                          ? SlipTheme.carbon
+                          : SlipTheme.steel,
+                    ),
                   ),
                 ),
               ),
@@ -481,6 +618,74 @@ class _SlipCardState extends State<SlipCard> {
     ),
   );
 }
+
+  void _handleSameTap() {
+    _sameController.forward(from: 0.0);
+    HapticFeedback.lightImpact();
+    widget.onSameTap();
+    setState(() => _showSameTooltip = true);
+    Timer(const Duration(milliseconds: 1400), () {
+      if (mounted) setState(() => _showSameTooltip = false);
+    });
+  }
+
+  void _handleSolveTap() {
+    _solveController.forward(from: 0.0);
+    HapticFeedback.mediumImpact();
+    widget.onSolveTap();
+  }
+
+  void _handleKeepTap() {
+    _bookmarkController.forward(from: 0.0);
+    HapticFeedback.lightImpact();
+    widget.onKeepTap();
+  }
+
+  void _confirmDelete(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: SlipTheme.canvas,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'DELETE POST',
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.5),
+        ),
+        content: const Text(
+          'Are you sure you want to permanently delete this post from the feed, database, and your profile?',
+          style: TextStyle(fontSize: 12, color: SlipTheme.steel, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('CANCEL', style: TextStyle(color: SlipTheme.steel)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: SlipTheme.trapRed,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('DELETE'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true && widget.provider != null) {
+      await widget.provider!.deleteSlip(widget.slip.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Post deleted permanently.'),
+            backgroundColor: SlipTheme.carbon,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    }
+  }
 
   void _openPostDetail(BuildContext context) {
     if (widget.provider != null) {

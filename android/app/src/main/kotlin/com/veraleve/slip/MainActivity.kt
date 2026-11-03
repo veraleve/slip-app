@@ -379,15 +379,19 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun playAudioFile(path: String?): Boolean {
-        if (path == null) return false
-        val file = File(path)
-        if (!file.exists()) return false
+        if (path.isNullOrBlank()) return false
 
         return try {
             mediaPlayer?.stop()
             mediaPlayer?.release()
             mediaPlayer = MediaPlayer().apply {
-                setDataSource(file.absolutePath)
+                if (path.startsWith("http://") || path.startsWith("https://")) {
+                    setDataSource(path)
+                } else {
+                    val file = File(path)
+                    if (!file.exists()) return false
+                    setDataSource(file.absolutePath)
+                }
                 prepare()
                 start()
                 setOnCompletionListener {

@@ -336,22 +336,6 @@ class _FeedScreenState extends State<FeedScreen>
                         },
                       ),
 
-                      // 4. General Doubts Pill
-                      _buildFilterChip(
-                        label: 'General',
-                        isSelected: provider.selectedSubjectFilter == 'General' || provider.selectedTopicFilter == 'General',
-                        onTap: () {
-                          final isGeneral = provider.selectedSubjectFilter == 'General' || provider.selectedTopicFilter == 'General';
-                          if (isGeneral) {
-                            provider.setTopicFilter('All');
-                            provider.setSubjectFilter('All');
-                          } else {
-                            provider.setSubjectFilter('General');
-                            provider.setTopicFilter('General');
-                          }
-                        },
-                      ),
-
                       // 4. Frequent Subject Pills
                       ...frequentTopics.map((subject) {
                         final isSelected = provider.selectedSubjectFilter == subject ||
