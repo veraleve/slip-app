@@ -1991,20 +1991,6 @@ class _LocalServerSettingsPageState extends State<_LocalServerSettingsPage> {
   final DesktopConnectService _service = DesktopConnectService();
   bool _isLoading = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _autoStartIfPossible();
-  }
-
-  Future<void> _autoStartIfPossible() async {
-    if (!_service.isRunning && widget.provider != null) {
-      setState(() => _isLoading = true);
-      await _service.startServer(widget.provider!);
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
   Future<void> _toggleServer() async {
     setState(() => _isLoading = true);
     if (_service.isRunning) {

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -570,6 +571,29 @@ class SupabaseService {
     } catch (_) {}
   }
 
+  Future<String?> uploadImageFile(String localPath) async {
+    if (_client == null) return null;
+    try {
+      final file = File(localPath);
+      if (!await file.exists()) return null;
+      final bytes = await file.readAsBytes();
+      final ext = localPath.split('.').last.toLowerCase();
+      final mime = (ext == 'png') ? 'image/png' : 'image/jpeg';
+      final fileName = 'slip_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(9999)}.$ext';
+
+      await _client!.storage.from('slip_media').uploadBinary(
+        fileName,
+        bytes,
+        fileOptions: FileOptions(contentType: mime, upsert: true),
+      );
+      final publicUrl = _client!.storage.from('slip_media').getPublicUrl(fileName);
+      return publicUrl;
+    } catch (e) {
+      debugPrint('Error uploading slip image: $e');
+      return null;
+    }
+  }
+
   Future<bool> submitSlip(Slip slip) async {
     // 1. Immediately cache locally for offline access
     final local = await loadLocalUserSlips();
@@ -591,18 +615,28 @@ class SupabaseService {
           ? slip.authorId!
           : ((_currentUserId != null && isUuid(_currentUserId!)) ? _currentUserId! : generateUuid());
 
+      String? imageUrl;
+      if (slip.imageUris.isNotEmpty) {
+        final firstImg = slip.imageUris.first;
+        if (firstImg.startsWith('http://') || firstImg.startsWith('https://')) {
+          imageUrl = firstImg;
+        } else {
+          imageUrl = await uploadImageFile(firstImg);
+        }
+      }
+
       await _client!.from('slips').insert({
         'id': slip.id,
-        'topic': slip.topic,
-        'subtopic': slip.subtopic,
-        'exam_tag': slip.examTag,
+        'topic': slip.topic.isNotEmpty ? slip.topic : 'General',
+        'subtopic': (slip.subtopic != null && slip.subtopic!.isNotEmpty) ? slip.subtopic : 'General',
+        'exam_tag': (slip.examTag != null && slip.examTag!.isNotEmpty) ? slip.examTag : 'General',
         'post_type': slip.postType.name,
-        'title': slip.title,
+        'title': slip.title ?? '',
         'is_resolved': slip.isResolved,
         'is_public': slip.isPublic,
-        'trap_statement': slip.trapStatement,
-        'fix_statement': slip.fixStatement,
-        'scratchpad_image_url': slip.imageUris.isNotEmpty ? slip.imageUris.first : null,
+        'trap_statement': slip.trapStatement.isNotEmpty ? slip.trapStatement : '',
+        'fix_statement': slip.fixStatement.isNotEmpty ? slip.fixStatement : '',
+        'scratchpad_image_url': imageUrl ?? (slip.imageUris.isNotEmpty ? slip.imageUris.first : null),
         'voice_audio_url': slip.voiceAudioUrl,
         'author_id': validAuthorId,
         'author_handle': slip.authorUsername ?? _currentUsername ?? 'peer',
@@ -644,18 +678,37 @@ class SupabaseService {
       await saveLocalUserSlips(local);
     }
 
+    if (slip.isPublic) {
+      final cached = await loadCachedFeed();
+      final cIdx = cached.indexWhere((s) => s.id == slip.id);
+      if (cIdx != -1) {
+        cached[cIdx] = slip;
+        await saveCachedFeed(cached);
+      }
+    }
+
     if (_client == null) return true;
     try {
+      String? imageUrl;
+      if (slip.imageUris.isNotEmpty) {
+        final firstImg = slip.imageUris.first;
+        if (firstImg.startsWith('http://') || firstImg.startsWith('https://')) {
+          imageUrl = firstImg;
+        } else {
+          imageUrl = await uploadImageFile(firstImg);
+        }
+      }
+
       await _client!.from('slips').update({
-        'topic': slip.topic,
-        'subtopic': slip.subtopic,
-        'exam_tag': slip.examTag,
+        'topic': slip.topic.isNotEmpty ? slip.topic : 'General',
+        'subtopic': (slip.subtopic != null && slip.subtopic!.isNotEmpty) ? slip.subtopic : 'General',
+        'exam_tag': (slip.examTag != null && slip.examTag!.isNotEmpty) ? slip.examTag : 'General',
         'post_type': slip.postType.name,
-        'title': slip.title,
+        'title': slip.title ?? '',
         'is_resolved': slip.isResolved,
-        'trap_statement': slip.trapStatement,
-        'fix_statement': slip.fixStatement,
-        'scratchpad_image_url': slip.imageUris.isNotEmpty ? slip.imageUris.first : null,
+        'trap_statement': slip.trapStatement.isNotEmpty ? slip.trapStatement : '',
+        'fix_statement': slip.fixStatement.isNotEmpty ? slip.fixStatement : '',
+        'scratchpad_image_url': imageUrl ?? (slip.imageUris.isNotEmpty ? slip.imageUris.first : null),
         'audio_duration_seconds': slip.audioDurationSeconds,
       }).eq('id', slip.id);
       return true;

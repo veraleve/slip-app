@@ -399,12 +399,21 @@ class _ProfileScreenState extends State<ProfileScreen>
                               children: [
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(10),
-                                  child: Image.file(
-                                    File(currentImages[i]),
-                                    width: 60,
-                                    height: 60,
-                                    fit: BoxFit.cover,
-                                  ),
+                                  child: currentImages[i].startsWith('http')
+                                      ? Image.network(
+                                          currentImages[i],
+                                          width: 60,
+                                          height: 60,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 20),
+                                        )
+                                      : Image.file(
+                                          File(currentImages[i]),
+                                          width: 60,
+                                          height: 60,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 20),
+                                        ),
                                 ),
                                 Positioned(
                                   top: 1,
@@ -1009,10 +1018,17 @@ class _ProfileScreenState extends State<ProfileScreen>
               fit: StackFit.expand,
               children: [
                 if (hasImage)
-                  Image.file(
-                    File(slip.imageUris.first),
-                    fit: BoxFit.cover,
-                  )
+                  slip.imageUris.first.startsWith('http')
+                      ? Image.network(
+                          slip.imageUris.first,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image, size: 20)),
+                        )
+                      : Image.file(
+                          File(slip.imageUris.first),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image, size: 20)),
+                        )
                 else
                   Padding(
                     padding: const EdgeInsets.all(8),

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import '../../constants/app_constants.dart';
 import '../../constants/gate_syllabus.dart';
 import '../../models/slip.dart';
 import '../../providers/slip_provider.dart';
@@ -105,7 +106,7 @@ class DesktopConnectService {
         'username': service.currentUsername ?? 'peer',
         'exams': service.targetExams,
         'supportedExams': GateSyllabus.supportedExams,
-        'version': 'v0.1.8',
+        'version': AppConstants.appVersion,
       };
       request.response.headers.contentType = ContentType.json;
       request.response.write(jsonEncode(data));

@@ -58,6 +58,7 @@ class _SlipCardState extends State<SlipCard> {
   Widget build(BuildContext context) {
     final slip = widget.slip;
     final isDoubt = slip.postType == PostType.doubt;
+    final isGeneralDoubt = isDoubt && (slip.examTag == 'General' || slip.topic == 'General' || slip.subtopic == 'General');
     final examShort = slip.examTag.replaceAll('GATE ', '').replaceAll(RegExp(r'\s*\d{4}'), '');
 
     return InkWell(
@@ -141,9 +142,9 @@ class _SlipCardState extends State<SlipCard> {
                         color: SlipTheme.carbon,
                         borderRadius: BorderRadius.circular(2),
                       ),
-                      child: const Text(
-                        'DOUBT',
-                        style: TextStyle(
+                      child: Text(
+                        isGeneralDoubt ? 'GENERAL DOUBT' : 'DOUBT',
+                        style: const TextStyle(
                           fontSize: 7.5,
                           fontWeight: FontWeight.w800,
                           color: SlipTheme.canvas,
@@ -228,35 +229,40 @@ class _SlipCardState extends State<SlipCard> {
                   ],
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: SlipTheme.surface,
-                  borderRadius: BorderRadius.circular(2),
-                  border: Border.all(color: SlipTheme.hairline, width: 0.6),
+              if (!isGeneralDoubt)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: SlipTheme.surface,
+                    borderRadius: BorderRadius.circular(2),
+                    border: Border.all(color: SlipTheme.hairline, width: 0.6),
+                  ),
+                  child: Text(
+                    examShort,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 9.5,
+                          color: SlipTheme.carbon,
+                        ),
+                  ),
                 ),
-                child: Text(
-                  examShort,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 9.5,
-                        color: SlipTheme.carbon,
-                      ),
-                ),
-              ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            '${slip.topic} · ${slip.subtopic ?? "General"}',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  fontWeight: FontWeight.w500,
-                  color: SlipTheme.steel,
-                  fontSize: 10,
-                ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          if (!isGeneralDoubt && slip.topic.isNotEmpty && slip.topic != 'General') ...[
+            const SizedBox(height: 4),
+            Text(
+              slip.subtopic != null && slip.subtopic!.isNotEmpty && slip.subtopic != 'General'
+                  ? '${slip.topic} · ${slip.subtopic}'
+                  : slip.topic,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: SlipTheme.steel,
+                    fontSize: 10,
+                  ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
           const SizedBox(height: 10),
 
           // 2. The Question Title or Blunder Statement
