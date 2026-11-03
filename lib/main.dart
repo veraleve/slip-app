@@ -8,18 +8,24 @@ import 'theme/slip_theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Set system UI overlay style
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      systemNavigationBarColor: SlipTheme.canvas,
-      systemNavigationBarIconBrightness: Brightness.dark,
-    ),
-  );
+  // Defensive system UI styling
+  try {
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: SlipTheme.canvas,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+    );
+  } catch (_) {}
 
-  // Initialize Supabase service
-  await SupabaseService().initialize();
+  // Safe service initialization
+  try {
+    await SupabaseService().initialize();
+  } catch (e) {
+    debugPrint('Initialization warning: $e');
+  }
 
   runApp(const SlipApp());
 }
@@ -41,10 +47,16 @@ class _SlipAppState extends State<SlipApp> {
   }
 
   void _checkInitialAuth() {
-    final auth = SupabaseService().isAuthenticated;
-    setState(() {
-      _isAuthenticated = auth;
-    });
+    try {
+      final auth = SupabaseService().isAuthenticated;
+      setState(() {
+        _isAuthenticated = auth;
+      });
+    } catch (_) {
+      setState(() {
+        _isAuthenticated = false;
+      });
+    }
   }
 
   void _onAuthenticated() {
