@@ -15,7 +15,7 @@ class HairlineInput extends StatelessWidget {
 
   const HairlineInput({
     super.key,
-    required this.label,
+    this.label = '',
     this.placeholder,
     this.hint,
     required this.controller,
@@ -35,25 +35,27 @@ class HairlineInput extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              label.toUpperCase(),
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
-                    color: SlipTheme.steel,
-                  ),
-            ),
-            if (helperText != null)
+        if (label.isNotEmpty) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
               Text(
-                helperText!,
-                style: Theme.of(context).textTheme.labelSmall,
+                label.toUpperCase(),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                      color: SlipTheme.steel,
+                    ),
               ),
-          ],
-        ),
-        const SizedBox(height: 6),
+              if (helperText != null)
+                Text(
+                  helperText!,
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+        ],
         TextField(
           controller: controller,
           obscureText: effectiveObscure,

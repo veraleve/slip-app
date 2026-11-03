@@ -213,10 +213,6 @@ class SupabaseService {
     }
   }
 
-  // --- 3. STREAM & MISTAKE TELEMETRY (STRICT PAPER ISOLATION) ---
-  Future<List<Slip>> fetchStream({
-    List<String>? userPapers,
-    String? topicFilter,
   // --- LOCAL-FIRST OFFLINE STORAGE FOR USER SLIPS ---
   Future<List<Slip>> loadLocalUserSlips() async {
     try {
