@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/slip.dart';
 import '../models/task_item.dart';
 import '../services/supabase_service.dart';
@@ -63,6 +64,7 @@ class SlipProvider extends ChangeNotifier {
   String get selectedSubjectFilter => _selectedSubjectFilter;
   String get selectedSubtopicFilter => _selectedSubtopicFilter;
   List<String> get userExams => _service.targetExams;
+  String? get currentUserId => _service.currentUserId;
 
   // Counts for profile
   int get sharedCount => _slips.where((s) => s.authorId != null).length;
