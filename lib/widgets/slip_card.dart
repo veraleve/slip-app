@@ -501,11 +501,6 @@ class _SlipCardState extends State<SlipCard> {
           ],
         ],
       ),
-          if (_showComments) ...[
-            CommentThreadSheet(slipId: slip.id),
-          ],
-        ],
-      ),
     );
   }
 

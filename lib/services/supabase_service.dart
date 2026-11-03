@@ -361,23 +361,21 @@ class SupabaseService {
         final prefs = await SharedPreferences.getInstance();
         final lastSyncIso = prefs.getString('slip_last_sync_timestamp');
 
-        var query = _client!.from('slips').select();
+        var filterQuery = _client!.from('slips').select();
 
         // Strict Paper Isolation
         if (allowedPapers.length == 1) {
-          query = query.eq('exam_tag', allowedPapers.first);
+          filterQuery = filterQuery.eq('exam_tag', allowedPapers.first);
         } else if (allowedPapers.length > 1) {
-          query = query.inFilter('exam_tag', allowedPapers);
+          filterQuery = filterQuery.inFilter('exam_tag', allowedPapers);
         }
 
         // DELTA SYNC: If user already has cached data and a lastSync timestamp, only fetch new records!
         if (lastSyncIso != null && cachedFeed.isNotEmpty) {
-          query = query.gt('created_at', lastSyncIso).order('created_at', ascending: false).limit(60);
-        } else {
-          query = query.order('created_at', ascending: false).limit(60);
+          filterQuery = filterQuery.gt('created_at', lastSyncIso);
         }
 
-        final response = await query;
+        final response = await filterQuery.order('created_at', ascending: false).limit(60);
         final list = response as List;
 
         if (list.isNotEmpty) {
