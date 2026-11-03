@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_constants.dart';
 import '../constants/gate_syllabus.dart';
 import '../providers/slip_provider.dart';
@@ -55,6 +56,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _peerMeshAlertsEnabled = prefs.getBool('slip_notif_peer') ?? true;
     _commentAlertsEnabled = prefs.getBool('slip_notif_comment') ?? true;
     if (mounted) setState(() {});
+  }
+
+  Future<void> _saveNotificationSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('slip_reminder_hour', _reminderTime.hour);
+    await prefs.setInt('slip_reminder_minute', _reminderTime.minute);
+    await prefs.setBool('slip_notif_daily', _dailyNotificationEnabled);
+    await prefs.setBool('slip_notif_peer', _peerMeshAlertsEnabled);
+    await prefs.setBool('slip_notif_comment', _commentAlertsEnabled);
   }
 
   Future<void> _checkPermissions() async {
@@ -385,11 +395,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     commentAlerts: _commentAlertsEnabled,
                     onDailyToggle: (val) {
                       setState(() => _dailyNotificationEnabled = val);
+                      _saveNotificationSettings();
                       if (val) NativeDeviceService.requestPermissions();
                     },
-                    onTimePicked: (t) => setState(() => _reminderTime = t),
-                    onPeerToggle: (val) => setState(() => _peerMeshAlertsEnabled = val),
-                    onCommentToggle: (val) => setState(() => _commentAlertsEnabled = val),
+                    onTimePicked: (t) {
+                      setState(() => _reminderTime = t);
+                      _saveNotificationSettings();
+                    },
+                    onPeerToggle: (val) {
+                      setState(() => _peerMeshAlertsEnabled = val);
+                      _saveNotificationSettings();
+                    },
+                    onCommentToggle: (val) {
+                      setState(() => _commentAlertsEnabled = val);
+                      _saveNotificationSettings();
+                    },
                     onTestAlert: _testAlert,
                   ),
                 ),
