@@ -79,8 +79,8 @@ class _AuthScreenState extends State<AuthScreen> {
       await service.setLoggedIn(
         true,
         rememberDevice: _rememberDevice,
-        username: username,
-        password: password,
+        username: handle ?? service.currentUsername ?? 'peer',
+        password: '',
       );
       widget.onAuthenticated();
     } else {
