@@ -345,6 +345,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onSameTap: () => widget.provider.toggleSame(slip.id),
                     onFixToggle: () => widget.provider.toggleFixRevealed(slip.id),
                     onKeepTap: () => widget.provider.toggleKeep(slip.id),
+                    onSolveTap: () => widget.provider.toggleCleared(slip.id),
                     onPassTap: () {},
                   );
                 }),

@@ -229,11 +229,7 @@ class SupabaseService {
     }
 
     try {
-      var query = _client!
-          .from('slips')
-          .select()
-          .order('created_at', ascending: false)
-          .limit(50);
+      var query = _client!.from('slips').select();
 
       // Strict Paper Isolation: only fetch slips matching user's registered papers
       if (allowedPapers.length == 1) {
@@ -246,7 +242,9 @@ class SupabaseService {
         query = query.eq('topic', topicFilter);
       }
 
-      final response = await query;
+      final response = await query
+          .order('created_at', ascending: false)
+          .limit(50);
       final list = response as List;
       if (list.isEmpty) {
         final mock = MockDataService.getInitialSlips();

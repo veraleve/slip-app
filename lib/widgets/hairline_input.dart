@@ -4,25 +4,34 @@ import '../theme/slip_theme.dart';
 class HairlineInput extends StatelessWidget {
   final String label;
   final String? placeholder;
+  final String? hint;
   final TextEditingController controller;
   final bool obscureText;
+  final bool isPassword;
   final Widget? suffixIcon;
   final String? helperText;
   final TextInputType keyboardType;
+  final int maxLines;
 
   const HairlineInput({
     super.key,
     required this.label,
     this.placeholder,
+    this.hint,
     required this.controller,
     this.obscureText = false,
+    this.isPassword = false,
     this.suffixIcon,
     this.helperText,
     this.keyboardType = TextInputType.text,
+    this.maxLines = 1,
   });
 
   @override
   Widget build(BuildContext context) {
+    final effectiveHint = hint ?? placeholder;
+    final effectiveObscure = isPassword || obscureText;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -31,9 +40,10 @@ class HairlineInput extends StatelessWidget {
           children: [
             Text(
               label.toUpperCase(),
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 1.0,
+                    letterSpacing: 0.8,
+                    color: SlipTheme.steel,
                   ),
             ),
             if (helperText != null)
@@ -46,15 +56,19 @@ class HairlineInput extends StatelessWidget {
         const SizedBox(height: 6),
         TextField(
           controller: controller,
-          obscureText: obscureText,
-          keyboardType: keyboardType,
+          obscureText: effectiveObscure,
+          keyboardType: effectiveObscure ? TextInputType.text : keyboardType,
+          maxLines: effectiveObscure ? 1 : maxLines,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w500,
+                color: SlipTheme.carbon,
+                fontSize: 14,
               ),
           decoration: InputDecoration(
-            hintText: placeholder,
+            hintText: effectiveHint,
             hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: SlipTheme.steelLight,
+                  fontSize: 13,
                 ),
             isDense: true,
             contentPadding: const EdgeInsets.symmetric(vertical: 8),

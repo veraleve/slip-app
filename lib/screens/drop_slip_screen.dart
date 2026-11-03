@@ -363,7 +363,7 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                               },
                               child: Container(
                                 decoration: const BoxDecoration(
-                                  color: Colors.black70,
+                                  color: Colors.black54,
                                   shape: BoxShape.circle,
                                 ),
                                 padding: const EdgeInsets.all(2),
