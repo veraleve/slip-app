@@ -350,6 +350,7 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
     final isGeneral = _selectedExam == 'General' || _isGeneralDoubt;
     final availableSubjects = isGeneral ? const ['General'] : GateSyllabus.getSubjectsForExam(_selectedExam);
     final availableSubtopics = isGeneral ? const ['General'] : GateSyllabus.getSubtopics(_selectedExam, _selectedSubject);
+    final allSubtopicOptions = availableSubtopics.isNotEmpty ? availableSubtopics : const ['General'];
 
     // Ensure valid selections
     if (isGeneral) {
@@ -359,9 +360,6 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
       if (!availableSubjects.contains(_selectedSubject)) {
         _selectedSubject = availableSubjects.first;
       }
-      final allSubtopicOptions = availableSubtopics.isNotEmpty
-          ? availableSubtopics
-          : ['General'];
       if (!allSubtopicOptions.contains(_selectedSubtopic)) {
         _selectedSubtopic = allSubtopicOptions.first;
       }
