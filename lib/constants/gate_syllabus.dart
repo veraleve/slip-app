@@ -1,8 +1,8 @@
 class GateSyllabus {
-  static const String gateCS = 'GATE CS 2027';
-  static const String gateDA = 'GATE DA 2027';
-  static const String gateEC = 'GATE EC 2027';
-  static const String gateEE = 'GATE EE 2027';
+  static const String gateCS = 'GATE CS';
+  static const String gateDA = 'GATE DA';
+  static const String gateEC = 'GATE EC';
+  static const String gateEE = 'GATE EE';
 
   static const List<String> supportedExams = [
     gateCS,
@@ -11,8 +11,16 @@ class GateSyllabus {
     gateEE,
   ];
 
+  // Normalize any incoming string (e.g. 'GATE CS 2027' -> 'GATE CS')
+  static String normalizeExam(String? exam) {
+    if (exam == null || exam.isEmpty) return gateCS;
+    final clean = exam.replaceAll(RegExp(r'\s*\d{4}$'), '').trim();
+    if (supportedExams.contains(clean)) return clean;
+    return gateCS;
+  }
+
   // ==========================================
-  // GATE CS 2027 (IIT Madras)
+  // GATE CS (Computer Science & IT)
   // ==========================================
   static const Map<String, List<String>> csSyllabus = {
     'Discrete Mathematics': [
@@ -113,7 +121,7 @@ class GateSyllabus {
   };
 
   // ==========================================
-  // GATE DA 2027 (IIT Madras)
+  // GATE DA (Data Science & AI)
   // ==========================================
   static const Map<String, List<String>> daSyllabus = {
     'Probability and Statistics': [
@@ -195,7 +203,7 @@ class GateSyllabus {
   };
 
   // ==========================================
-  // GATE EC 2027 (IIT Madras)
+  // GATE EC (Electronics & Communication)
   // ==========================================
   static const Map<String, List<String>> ecSyllabus = {
     'Engineering Mathematics': [
@@ -267,7 +275,7 @@ class GateSyllabus {
   };
 
   // ==========================================
-  // GATE EE 2027 (IIT Madras)
+  // GATE EE (Electrical Engineering)
   // ==========================================
   static const Map<String, List<String>> eeSyllabus = {
     'Engineering Mathematics': [
@@ -354,7 +362,8 @@ class GateSyllabus {
   };
 
   static List<String> getSubjectsForExam(String exam) {
-    switch (exam) {
+    final normalized = normalizeExam(exam);
+    switch (normalized) {
       case gateDA:
         return daSyllabus.keys.toList();
       case gateEC:
@@ -368,7 +377,8 @@ class GateSyllabus {
   }
 
   static List<String> getSubtopics(String exam, String subject) {
-    switch (exam) {
+    final normalized = normalizeExam(exam);
+    switch (normalized) {
       case gateDA:
         return daSyllabus[subject] ?? [];
       case gateEC:

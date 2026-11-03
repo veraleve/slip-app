@@ -217,15 +217,40 @@ class SupabaseService {
   Future<List<Slip>> fetchStream({
     List<String>? userPapers,
     String? topicFilter,
+  // --- LOCAL-FIRST OFFLINE STORAGE FOR USER SLIPS ---
+  Future<List<Slip>> loadLocalUserSlips() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rawList = prefs.getStringList('slip_local_user_slips') ?? [];
+      return rawList.map((str) => Slip.fromJson(jsonDecode(str) as Map<String, dynamic>)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> saveLocalUserSlips(List<Slip> slips) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userSlips = slips.where((s) => s.authorId != null && s.authorId == _currentUserId).toList();
+      final rawList = userSlips.map((s) => jsonEncode(s.toJson())).toList();
+      await prefs.setStringList('slip_local_user_slips', rawList);
+    } catch (_) {}
+  }
+
+  Future<List<Slip>> fetchStream({
+    String? topicFilter,
+    List<String>? userPapers,
   }) async {
     final allowedPapers = (userPapers != null && userPapers.isNotEmpty)
         ? userPapers
         : _targetExams;
 
+    // 1. Always load local user slips first (instant offline availability)
+    final localUserSlips = await loadLocalUserSlips();
+
     if (_client == null) {
-      // Filter mock slips strictly by allowed papers
       final mock = MockDataService.getInitialSlips();
-      return mock.where((s) => allowedPapers.contains(s.examTag)).toList();
+      return [...localUserSlips, ...mock.where((s) => allowedPapers.contains(s.examTag))];
     }
 
     try {
@@ -238,7 +263,7 @@ class SupabaseService {
         query = query.inFilter('exam_tag', allowedPapers);
       }
 
-      if (topicFilter != null && topicFilter.isNotEmpty && topicFilter != 'All') {
+      if (topicFilter != null && topicFilter.isNotEmpty && topicFilter != 'All' && topicFilter != 'For You') {
         query = query.eq('topic', topicFilter);
       }
 
@@ -246,17 +271,26 @@ class SupabaseService {
           .order('created_at', ascending: false)
           .limit(50);
       final list = response as List;
-      if (list.isEmpty) {
-        final mock = MockDataService.getInitialSlips();
-        return mock.where((s) => allowedPapers.contains(s.examTag)).toList();
-      }
 
-      return list
+      final fetched = list
           .map((item) => Slip.fromJson(item as Map<String, dynamic>))
           .toList();
+
+      final Map<String, Slip> merged = {};
+      for (final s in localUserSlips) {
+        merged[s.id] = s;
+      }
+      for (final s in fetched) {
+        merged[s.id] = s;
+      }
+
+      final result = merged.values.toList();
+      result.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return result;
     } catch (e) {
+      // Offline fallback: return user's local slips + mock data
       final mock = MockDataService.getInitialSlips();
-      return mock.where((s) => allowedPapers.contains(s.examTag)).toList();
+      return [...localUserSlips, ...mock.where((s) => allowedPapers.contains(s.examTag))];
     }
   }
 
@@ -275,9 +309,15 @@ class SupabaseService {
   }
 
   Future<bool> submitSlip(Slip slip) async {
+    // 1. Immediately cache locally for offline access
+    final local = await loadLocalUserSlips();
+    local.insert(0, slip);
+    await saveLocalUserSlips(local);
+
     if (_client == null) return true;
     try {
       await _client!.from('slips').insert({
+        'id': slip.id,
         'topic': slip.topic,
         'subtopic': slip.subtopic,
         'exam_tag': slip.examTag,
@@ -291,6 +331,64 @@ class SupabaseService {
     } catch (_) {
       return false;
     }
+  }
+
+  Future<bool> updateSlip(Slip slip) async {
+    // 1. Immediately update locally
+    final local = await loadLocalUserSlips();
+    final idx = local.indexWhere((s) => s.id == slip.id);
+    if (idx != -1) {
+      local[idx] = slip;
+      await saveLocalUserSlips(local);
+    }
+
+    if (_client == null) return true;
+    try {
+      await _client!.from('slips').update({
+        'topic': slip.topic,
+        'subtopic': slip.subtopic,
+        'exam_tag': slip.examTag,
+        'trap_statement': slip.trapStatement,
+        'fix_statement': slip.fixStatement,
+        'image_uris': slip.imageUris,
+        'audio_duration_seconds': slip.audioDurationSeconds,
+      }).eq('id', slip.id);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteSlip(String slipId) async {
+    // 1. Immediately delete locally
+    final local = await loadLocalUserSlips();
+    local.removeWhere((s) => s.id == slipId);
+    await saveLocalUserSlips(local);
+
+    if (_client == null) return true;
+    try {
+      await _client!.from('slips').delete().eq('id', slipId);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // --- 5. TASKS / MOCK TEST REMINDER STORAGE (OFFLINE-FIRST) ---
+  Future<List<String>> loadTasksRaw() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getStringList('slip_local_tasks') ?? [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> saveTasksRaw(List<String> rawTasks) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('slip_local_tasks', rawTasks);
+    } catch (_) {}
   }
 
   // --- 4. COMMENTS SYSTEM (HYBRID SYNC) ---

@@ -4,9 +4,11 @@ import '../models/slip.dart';
 class MockDataService {
   static List<Slip> getInitialSlips() {
     return [
-      // --- GATE CS 2027 ---
+      // --- GATE CS ---
       Slip(
         id: 'slip-cs-01',
+        authorId: 'peer_arya',
+        authorUsername: 'arya',
         topic: 'Linear Algebra',
         subtopic: 'Eigenvalues & Eigenvectors',
         examTag: GateSyllabus.gateCS,
@@ -22,6 +24,8 @@ class MockDataService {
       ),
       Slip(
         id: 'slip-cs-02',
+        authorId: 'peer_rohit',
+        authorUsername: 'rohit',
         topic: 'Computer Organization & Architecture',
         subtopic: 'Instruction Pipelining & Pipeline Hazards',
         examTag: GateSyllabus.gateCS,
@@ -37,6 +41,8 @@ class MockDataService {
       ),
       Slip(
         id: 'slip-cs-03',
+        authorId: 'peer_kavya',
+        authorUsername: 'kavya',
         topic: 'Operating System',
         subtopic: 'Deadlock Detection & Avoidance',
         examTag: GateSyllabus.gateCS,
@@ -51,9 +57,11 @@ class MockDataService {
         createdAt: DateTime.now().subtract(const Duration(hours: 14)),
       ),
 
-      // --- GATE DA 2027 ---
+      // --- GATE DA ---
       Slip(
         id: 'slip-da-01',
+        authorId: 'peer_devansh',
+        authorUsername: 'devansh',
         topic: 'Machine Learning',
         subtopic: 'Support Vector Machine (SVM)',
         examTag: GateSyllabus.gateDA,
@@ -69,6 +77,8 @@ class MockDataService {
       ),
       Slip(
         id: 'slip-da-02',
+        authorId: 'peer_meera',
+        authorUsername: 'meera',
         topic: 'Probability and Statistics',
         subtopic: 'Bayes Theorem & Total Probability',
         examTag: GateSyllabus.gateDA,
@@ -84,6 +94,8 @@ class MockDataService {
       ),
       Slip(
         id: 'slip-da-03',
+        authorId: 'peer_rohit',
+        authorUsername: 'rohit',
         topic: 'Artificial Intelligence',
         subtopic: 'Informed & Uninformed Search (BFS, DFS, A*)',
         examTag: GateSyllabus.gateDA,
@@ -98,9 +110,11 @@ class MockDataService {
         createdAt: DateTime.now().subtract(const Duration(hours: 18)),
       ),
 
-      // --- GATE EC 2027 ---
+      // --- GATE EC ---
       Slip(
         id: 'slip-ec-01',
+        authorId: 'peer_tanvi',
+        authorUsername: 'tanvi',
         topic: 'Analog Circuits',
         subtopic: 'Op-Amp Circuits, Summers, Integrators, Filters',
         examTag: GateSyllabus.gateEC,
@@ -116,6 +130,8 @@ class MockDataService {
       ),
       Slip(
         id: 'slip-ec-02',
+        authorId: 'peer_arya',
+        authorUsername: 'arya',
         topic: 'Networks, Signals and Systems',
         subtopic: 'LTI Systems: Impulse Response, Convolution, Poles/Zeroes',
         examTag: GateSyllabus.gateEC,
@@ -130,9 +146,11 @@ class MockDataService {
         createdAt: DateTime.now().subtract(const Duration(hours: 16)),
       ),
 
-      // --- GATE EE 2027 ---
+      // --- GATE EE ---
       Slip(
         id: 'slip-ee-01',
+        authorId: 'peer_devansh',
+        authorUsername: 'devansh',
         topic: 'Electrical Machines',
         subtopic: 'Single-Phase Transformer: Phasors, OC/SC Tests, Regulation',
         examTag: GateSyllabus.gateEE,
@@ -148,6 +166,8 @@ class MockDataService {
       ),
       Slip(
         id: 'slip-ee-02',
+        authorId: 'peer_kavya',
+        authorUsername: 'kavya',
         topic: 'Power Systems',
         subtopic: 'Power System Stability & Equal Area Criterion',
         examTag: GateSyllabus.gateEE,

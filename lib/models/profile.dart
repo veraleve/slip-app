@@ -1,3 +1,5 @@
+import '../constants/gate_syllabus.dart';
+
 class Profile {
   final String id;
   final String handle;
@@ -12,7 +14,7 @@ class Profile {
   const Profile({
     required this.id,
     required this.handle,
-    this.targetExams = const ['GATE CS 2027'],
+    this.targetExams = const [GateSyllabus.gateCS],
     this.avatarGlyph,
     this.sharedCount = 0,
     this.clearedCount = 0,
@@ -21,17 +23,17 @@ class Profile {
     required this.createdAt,
   });
 
-  String get primaryExam => targetExams.isNotEmpty ? targetExams.first : 'GATE CS 2027';
+  String get primaryExam => targetExams.isNotEmpty ? targetExams.first : GateSyllabus.gateCS;
 
   factory Profile.fromJson(Map<String, dynamic> json) {
     List<String> exams = [];
     if (json['target_exams'] is List) {
-      exams = (json['target_exams'] as List).map((e) => e.toString()).toList();
+      exams = (json['target_exams'] as List).map((e) => GateSyllabus.normalizeExam(e.toString())).toList();
     } else if (json['target_exam'] is String && (json['target_exam'] as String).isNotEmpty) {
-      exams = [json['target_exam'] as String];
+      exams = [GateSyllabus.normalizeExam(json['target_exam'] as String)];
     }
     if (exams.isEmpty) {
-      exams = ['GATE CS 2027'];
+      exams = [GateSyllabus.gateCS];
     }
 
     return Profile(

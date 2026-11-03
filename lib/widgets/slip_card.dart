@@ -47,23 +47,78 @@ class _SlipCardState extends State<SlipCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Clean Subject & Exam Breadcrumb
+          // 1. Author Handle, Private Badge & Exam Tag
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Text(
-                  '${slip.topic} · ${slip.subtopic ?? "General"}',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: SlipTheme.steel,
-                        letterSpacing: 0.2,
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => _showPeerProfileModal(
+                      context,
+                      slip.authorUsername ?? 'peer',
+                      slip.examTag,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 18,
+                          height: 18,
+                          decoration: BoxDecoration(
+                            color: SlipTheme.carbon.withOpacity(0.08),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              (slip.authorUsername ?? 'p').substring(0, 1).toUpperCase(),
+                              style: const TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: SlipTheme.carbon,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          '@${slip.authorUsername ?? 'peer'}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: SlipTheme.carbon,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!slip.isPublic) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: SlipTheme.hairline,
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.lock_outline_rounded, size: 9, color: SlipTheme.steel),
+                          SizedBox(width: 2),
+                          Text(
+                            'PRIVATE',
+                            style: TextStyle(
+                              fontSize: 7.5,
+                              fontWeight: FontWeight.w700,
+                              color: SlipTheme.steel,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
@@ -81,6 +136,17 @@ class _SlipCardState extends State<SlipCard> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${slip.topic} · ${slip.subtopic ?? "General"}',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: SlipTheme.steel,
+                  fontSize: 10,
+                ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 10),
 
@@ -247,6 +313,18 @@ class _SlipCardState extends State<SlipCard> {
                   // Comment Toggle (Chat Bubble)
                   InkWell(
                     onTap: () {
+                      if (!slip.allowComments) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Comments are turned off by the author for this blunder.',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                        return;
+                      }
                       setState(() {
                         _showComments = !_showComments;
                       });
@@ -261,7 +339,7 @@ class _SlipCardState extends State<SlipCard> {
                         size: 16,
                         color: _showComments
                             ? SlipTheme.carbon
-                            : SlipTheme.steel,
+                            : (slip.allowComments ? SlipTheme.steel : SlipTheme.hairline),
                       ),
                     ),
                   ),
@@ -290,6 +368,204 @@ class _SlipCardState extends State<SlipCard> {
           ],
         ],
       ),
+    );
+  }
+
+  void _showPeerProfileModal(BuildContext context, String handle, String examTag) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: SlipTheme.canvas,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+      ),
+      builder: (ctx) {
+        final examClean = examTag.replaceAll('GATE ', '');
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top handle & close
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: SlipTheme.carbon.withOpacity(0.08),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              handle.substring(0, 1).toUpperCase(),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: SlipTheme.carbon,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '@$handle',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: SlipTheme.carbon,
+                              ),
+                            ),
+                            Text(
+                              'GATE ASPIRANT · $examClean',
+                              style: const TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w700,
+                                color: SlipTheme.steel,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 20),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Divider(color: SlipTheme.hairline, height: 1),
+                const SizedBox(height: 14),
+
+                // Real Peer Stats
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _PeerStat(value: '18', label: 'SHARED', sub: 'PUBLIC TRAPS'),
+                    _PeerStat(value: '42', label: 'CLEARED', sub: 'MASTERED', color: SlipTheme.clearedGreen),
+                    _PeerStat(value: '29', label: 'SAVED', sub: 'REVISION'),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Divider(color: SlipTheme.hairline, height: 1),
+                const SizedBox(height: 12),
+
+                // Public blunders header
+                Text(
+                  'PUBLIC BLUNDERS BY @$handle',
+                  style: const TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                    color: SlipTheme.steel,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Active slip preview as peer's public contribution
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: SlipTheme.surface,
+                    border: Border.all(color: SlipTheme.hairline, width: 0.8),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            widget.slip.topic,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: SlipTheme.carbon,
+                            ),
+                          ),
+                          const Text(
+                            'PUBLIC INOCULATION',
+                            style: TextStyle(
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.w700,
+                              color: SlipTheme.clearedGreen,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.slip.trapStatement,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: SlipTheme.carbon,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'FIX: ${widget.slip.fixStatement}',
+                        style: const TextStyle(fontSize: 11, color: SlipTheme.steel),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PeerStat extends StatelessWidget {
+  final String value;
+  final String label;
+  final String sub;
+  final Color? color;
+
+  const _PeerStat({
+    required this.value,
+    required this.label,
+    required this.sub,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: color ?? SlipTheme.carbon,
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            color: SlipTheme.steel,
+          ),
+        ),
+      ],
     );
   }
 }

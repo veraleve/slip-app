@@ -31,8 +31,8 @@ class _SplashPrincipleScreenState extends State<SplashPrincipleScreen>
 
     _animController.forward();
 
-    // Auto-proceed after 1.8 seconds
-    _timer = Timer(const Duration(milliseconds: 1800), () {
+    // Auto-proceed after 2 seconds
+    _timer = Timer(const Duration(milliseconds: 2000), () {
       if (mounted) widget.onComplete();
     });
   }
@@ -47,104 +47,123 @@ class _SplashPrincipleScreenState extends State<SplashPrincipleScreen>
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: widget.onComplete, // tap to skip immediately
+      onTap: widget.onComplete, // Tap anywhere to skip immediately
+      behavior: HitTestBehavior.opaque,
       child: Scaffold(
         backgroundColor: SlipTheme.canvas,
         body: SafeArea(
           child: FadeTransition(
             opacity: _fadeAnimation,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Spacer(flex: 3),
+            child: SizedBox(
+              width: double.infinity,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 36),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Spacer(flex: 3),
 
-                  // Minimalist Geometric Logo
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: SlipTheme.carbon,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Center(
-                      child: Container(
-                        width: 14,
-                        height: 2,
-                        decoration: BoxDecoration(
-                          color: SlipTheme.canvas,
-                          borderRadius: BorderRadius.circular(1),
-                        ),
+                    // Centered Minimalist Geometric Logo
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: SlipTheme.carbon,
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // App Title
-                  Text(
-                    'Slip',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: SlipTheme.carbon,
-                          fontSize: 32,
-                          letterSpacing: -0.8,
-                        ),
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  // Core Principle Statement
-                  Text(
-                    '“Learn from others’ mistakes too.”',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: SlipTheme.carbon,
-                          fontSize: 18,
-                          height: 1.35,
-                          letterSpacing: -0.2,
-                        ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'You won\'t have time to make them all yourself before GATE 2027.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: SlipTheme.steel,
-                          fontSize: 13,
-                          height: 1.45,
-                        ),
-                  ),
-
-                  const Spacer(flex: 4),
-
-                  // Subtle Footer
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'GATE 2027 · INOCULATION NETWORK',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: SlipTheme.steel,
-                              fontSize: 9,
-                              letterSpacing: 0.8,
-                              fontWeight: FontWeight.w700,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 22,
+                              height: 3,
+                              decoration: BoxDecoration(
+                                color: SlipTheme.canvas,
+                                borderRadius: BorderRadius.circular(1.5),
+                              ),
                             ),
-                      ),
-                      Text(
-                        'OFFLINE BLE MESH',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: SlipTheme.steel,
-                              fontSize: 9,
-                              letterSpacing: 0.8,
-                              fontWeight: FontWeight.w700,
+                            const SizedBox(height: 5),
+                            Container(
+                              width: 14,
+                              height: 2,
+                              decoration: BoxDecoration(
+                                color: SlipTheme.steelLight,
+                                borderRadius: BorderRadius.circular(1),
+                              ),
                             ),
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                ],
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // App Name
+                    Text(
+                      'Slip',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: SlipTheme.carbon,
+                            fontSize: 34,
+                            letterSpacing: -0.8,
+                          ),
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    // Minimalist Core Principle
+                    Text(
+                      '“Learn from others’ mistakes too.”',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: SlipTheme.carbon,
+                            fontSize: 18,
+                            height: 1.35,
+                            letterSpacing: -0.2,
+                          ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'You won\'t have time to make them all yourself before the exam.',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: SlipTheme.steel,
+                            fontSize: 13.5,
+                            height: 1.45,
+                          ),
+                    ),
+
+                    const Spacer(flex: 4),
+
+                    // Subtle Centered Footer
+                    Text(
+                      'GATE · MISTAKE INOCULATION NETWORK',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: SlipTheme.steel,
+                            fontSize: 9.5,
+                            letterSpacing: 1.2,
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'OFFLINE BLE MESH · PEER LEARNING',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: SlipTheme.steelLight,
+                            fontSize: 8.5,
+                            letterSpacing: 1.0,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
             ),
           ),

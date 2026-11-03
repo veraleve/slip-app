@@ -139,7 +139,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Learn from peer blunders · Inoculate before GATE 2027',
+                    'Learn from peer blunders · Inoculate before the exam',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: SlipTheme.steel,
                         ),
@@ -161,7 +161,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     runSpacing: 8,
                     children: GateSyllabus.supportedExams.map((exam) {
                       final isSelected = _selectedExams.contains(exam);
-                      final label = exam.replaceAll(' 2027', '');
+                      final label = exam;
                       return InkWell(
                         onTap: () => _toggleExam(exam),
                         borderRadius: BorderRadius.circular(3),

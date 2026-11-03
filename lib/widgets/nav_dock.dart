@@ -44,8 +44,8 @@ class NavDock extends StatelessWidget {
             onTap: () => onTabSelected(1),
           ),
           _DockItem(
-            label: 'ALERTS',
-            icon: Icons.notifications_none_rounded,
+            label: 'TASKS',
+            icon: Icons.task_alt_rounded,
             isActive: activeIndex == 2,
             onTap: () => onTabSelected(2),
           ),

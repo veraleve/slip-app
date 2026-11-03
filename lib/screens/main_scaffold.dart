@@ -3,9 +3,9 @@ import '../providers/slip_provider.dart';
 import '../theme/slip_theme.dart';
 import '../widgets/nav_dock.dart';
 import 'drop_slip_screen.dart';
-import 'notifications_screen.dart';
 import 'profile_screen.dart';
 import 'stream_screen.dart';
+import 'tasks_screen.dart';
 
 class MainScaffold extends StatefulWidget {
   final VoidCallback onSignOut;
@@ -50,11 +50,7 @@ class _MainScaffoldState extends State<MainScaffold> {
               children: [
                 StreamScreen(provider: _slipProvider),
                 DropSlipScreen(provider: _slipProvider),
-                NotificationsScreen(
-                  onOpenReviewCycle: () {
-                    _slipProvider.setTabIndex(0);
-                  },
-                ),
+                TasksScreen(provider: _slipProvider),
                 ProfileScreen(
                   provider: _slipProvider,
                   onSignOut: widget.onSignOut,
