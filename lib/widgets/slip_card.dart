@@ -396,28 +396,12 @@ class _SlipCardState extends State<SlipCard> {
                   InkWell(
                     onTap: () => _openPostDetail(context),
                     borderRadius: BorderRadius.circular(14),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.chat_bubble_outline_rounded,
-                            size: 17,
-                            color: SlipTheme.steel,
-                          ),
-                          if (slip.commentsCount > 0) ...[
-                            const SizedBox(width: 4),
-                            Text(
-                              '${slip.commentsCount}',
-                              style: const TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: SlipTheme.steel,
-                              ),
-                            ),
-                          ],
-                        ],
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                      child: Icon(
+                        Icons.chat_bubble_outline_rounded,
+                        size: 18,
+                        color: SlipTheme.steel,
                       ),
                     ),
                   ),
@@ -487,8 +471,9 @@ class _SlipCardState extends State<SlipCard> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _openPostDetail(BuildContext context) {
     if (widget.provider != null) {
