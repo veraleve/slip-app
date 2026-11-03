@@ -34,11 +34,12 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
   bool _allowComments = true;
   bool _isPublic = true;
 
-  // Voice note recording simulation & state
+  // Voice note recording state
   bool _isRecordingVoice = false;
   int _voiceSeconds = 0;
   Timer? _voiceTimer;
   bool _hasVoiceNote = false;
+  String? _recordedAudioPath;
   bool _isPlayingVoicePreview = false;
 
   @override
@@ -94,11 +95,22 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
     }
   }
 
-  void _startVoiceRecording() {
+  Future<void> _startVoiceRecording() async {
+    final started = await NativeDeviceService.startAudioRecording();
+    if (!started && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Microphone permission required for audio blunder note.'),
+          backgroundColor: SlipTheme.carbon,
+        ),
+      );
+      return;
+    }
     setState(() {
       _isRecordingVoice = true;
       _voiceSeconds = 0;
       _hasVoiceNote = false;
+      _recordedAudioPath = null;
     });
     _voiceTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
@@ -109,20 +121,24 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
     });
   }
 
-  void _stopVoiceRecording() {
+  Future<void> _stopVoiceRecording() async {
     _voiceTimer?.cancel();
+    final path = await NativeDeviceService.stopAudioRecording();
     setState(() {
       _isRecordingVoice = false;
+      _recordedAudioPath = path;
       _hasVoiceNote = _voiceSeconds > 0;
     });
   }
 
   void _deleteVoiceNote() {
     _voiceTimer?.cancel();
+    NativeDeviceService.stopAudio();
     setState(() {
       _isRecordingVoice = false;
       _voiceSeconds = 0;
       _hasVoiceNote = false;
+      _recordedAudioPath = null;
       _isPlayingVoicePreview = false;
     });
   }
@@ -285,6 +301,7 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
       trapStatement: trap,
       fixStatement: fix,
       imageUris: _attachedImages,
+      voiceAudioUrl: _recordedAudioPath,
       audioDurationSeconds: _hasVoiceNote ? _voiceSeconds : 0,
       allowComments: _allowComments,
       isPublic: isDoubt ? true : _isPublic,
@@ -679,76 +696,109 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
 
               const SizedBox(height: 24),
 
-              // 5. Media Options: Camera & Voice Recording
-              Text(
-                'ATTACH EVIDENCE (PHOTOS & VOICE NOTE)',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: SlipTheme.steel,
-                      letterSpacing: 0.6,
-                    ),
-              ),
-              const SizedBox(height: 10),
-
+              // 5. Media Options: Camera & Mic Icons
               Row(
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _capturePhoto,
-                      icon: const Icon(Icons.camera_alt_outlined, size: 16),
-                      label: Text(
-                        _attachedImages.isEmpty
-                            ? 'ADD PHOTO'
-                            : 'ADD PHOTO (${_attachedImages.length})',
-                        style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700),
+                  // Camera Icon Action Button
+                  InkWell(
+                    onTap: _capturePhoto,
+                    borderRadius: BorderRadius.circular(4),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: SlipTheme.surface,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: SlipTheme.hairline, width: 0.8),
                       ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: SlipTheme.carbon,
-                        side: const BorderSide(color: SlipTheme.hairline, width: 0.8),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.photo_camera_outlined, size: 20, color: SlipTheme.carbon),
+                          if (_attachedImages.isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: SlipTheme.carbon,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '${_attachedImages.length}',
+                                style: const TextStyle(
+                                  color: SlipTheme.canvas,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ),
+
                   const SizedBox(width: 10),
-                  Expanded(
-                    child: _isRecordingVoice
-                        ? ElevatedButton.icon(
-                            onPressed: _stopVoiceRecording,
-                            icon: const Icon(Icons.stop_rounded, size: 16, color: Colors.white),
-                            label: Text(
-                              'STOP (${_voiceSeconds}s)',
-                              style: const TextStyle(
-                                  fontSize: 10.5, fontWeight: FontWeight.w700, color: Colors.white),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: SlipTheme.trapRed,
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                            ),
-                          )
-                        : OutlinedButton.icon(
-                            onPressed: _hasVoiceNote ? null : _startVoiceRecording,
-                            icon: Icon(
-                              _hasVoiceNote ? Icons.mic_rounded : Icons.mic_none_rounded,
-                              size: 16,
-                              color: _hasVoiceNote ? SlipTheme.clearedGreen : SlipTheme.carbon,
-                            ),
-                            label: Text(
-                              _hasVoiceNote ? 'RECORDED (${_voiceSeconds}s)' : 'RECORD VOICE',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w700,
-                                color: _hasVoiceNote ? SlipTheme.clearedGreen : SlipTheme.carbon,
-                              ),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: SlipTheme.carbon,
-                              side: BorderSide(
-                                color: _hasVoiceNote ? SlipTheme.clearedGreen : SlipTheme.hairline,
-                                width: 0.8,
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                            ),
+
+                  // Mic Icon Action Button
+                  InkWell(
+                    onTap: () {
+                      if (_isRecordingVoice) {
+                        _stopVoiceRecording();
+                      } else if (!_hasVoiceNote) {
+                        _startVoiceRecording();
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(4),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _isRecordingVoice
+                            ? SlipTheme.trapRed.withOpacity(0.08)
+                            : (_hasVoiceNote ? SlipTheme.clearedGreen.withOpacity(0.08) : SlipTheme.surface),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: _isRecordingVoice
+                              ? SlipTheme.trapRed
+                              : (_hasVoiceNote ? SlipTheme.clearedGreen : SlipTheme.hairline),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _isRecordingVoice
+                                ? Icons.stop_rounded
+                                : (_hasVoiceNote ? Icons.mic_rounded : Icons.mic_none_rounded),
+                            size: 20,
+                            color: _isRecordingVoice
+                                ? SlipTheme.trapRed
+                                : (_hasVoiceNote ? SlipTheme.clearedGreen : SlipTheme.carbon),
                           ),
+                          if (_isRecordingVoice) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              '${_voiceSeconds}s',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: SlipTheme.trapRed,
+                              ),
+                            ),
+                          ] else if (_hasVoiceNote) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              '${_voiceSeconds}s',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: SlipTheme.clearedGreen,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -761,29 +811,14 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                   decoration: BoxDecoration(
                     color: SlipTheme.surface,
                     border: Border.all(color: SlipTheme.hairline, width: 0.8),
-                    borderRadius: BorderRadius.circular(3),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
                     children: [
-                      GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _isPlayingVoicePreview = !_isPlayingVoicePreview;
-                          });
-                        },
-                        child: Icon(
-                          _isPlayingVoicePreview
-                              ? Icons.pause_circle_filled_rounded
-                              : Icons.play_circle_fill_rounded,
-                          color: SlipTheme.carbon,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
                       Expanded(
                         child: AudioWaveformStrip(
                           durationSeconds: _voiceSeconds,
-                          isPlaying: _isPlayingVoicePreview,
+                          audioUrl: _recordedAudioPath,
                         ),
                       ),
                       const SizedBox(width: 8),

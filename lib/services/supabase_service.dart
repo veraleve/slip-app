@@ -16,6 +16,10 @@ class SupabaseService {
   SupabaseClient? _client;
   String? _currentUsername;
   String? _currentUserId;
+  bool _isLoggedIn = false;
+  bool _rememberDevice = true;
+  String? _savedUsername;
+  String? _savedPassword;
   List<String> _targetExams = [GateSyllabus.gateCS];
 
   Future<void> initialize() async {
@@ -27,10 +31,26 @@ class SupabaseService {
         );
       }
 
-      // Restore cached session
+      // Restore cached session or generate stable anonymous peer session
       final prefs = await SharedPreferences.getInstance();
       _currentUsername = prefs.getString('slip_username');
       _currentUserId = prefs.getString('slip_user_id');
+      _isLoggedIn = prefs.getBool('slip_is_logged_in') ?? false;
+      _rememberDevice = prefs.getBool('slip_remember_device') ?? true;
+      _savedUsername = prefs.getString('slip_saved_username');
+      _savedPassword = prefs.getString('slip_saved_password');
+
+      if (_currentUserId == null || !isUuid(_currentUserId!)) {
+        _currentUserId = generateUuid();
+        await prefs.setString('slip_user_id', _currentUserId!);
+      }
+
+      if (_currentUsername == null || _currentUsername!.isEmpty) {
+        final randomHex = (Random().nextInt(0xFFFFFF) + 0x100000).toRadixString(16);
+        _currentUsername = 'peer_$randomHex';
+        await prefs.setString('slip_username', _currentUsername!);
+      }
+
       final savedExams = prefs.getStringList('slip_target_exams');
       if (savedExams != null && savedExams.isNotEmpty) {
         _targetExams = savedExams;
@@ -41,11 +61,42 @@ class SupabaseService {
   }
 
   SupabaseClient? get client => _client;
-  bool get isAuthenticated => _currentUsername != null && _currentUsername!.isNotEmpty;
+  bool get isAuthenticated =>
+      (_isLoggedIn && _rememberDevice) ||
+      (_currentUsername != null &&
+          _currentUsername!.isNotEmpty &&
+          !_currentUsername!.startsWith('peer_'));
+  bool get isLoggedIn => _isLoggedIn;
+  bool get rememberDevice => _rememberDevice;
+  String? get savedUsername => _savedUsername ?? _currentUsername;
+  String? get savedPassword => _savedPassword;
   String? get currentUsername => _currentUsername;
   String? get currentUserId => _currentUserId ?? 'peer_local';
   List<String> get targetExams => List.unmodifiable(_targetExams);
   String get primaryExam => _targetExams.isNotEmpty ? _targetExams.first : GateSyllabus.gateCS;
+
+  Future<void> setLoggedIn(
+    bool value, {
+    bool rememberDevice = true,
+    String? username,
+    String? password,
+  }) async {
+    _isLoggedIn = value;
+    _rememberDevice = rememberDevice;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('slip_is_logged_in', value);
+    await prefs.setBool('slip_remember_device', rememberDevice);
+    if (username != null) {
+      _savedUsername = username;
+      await prefs.setString('slip_saved_username', username);
+    }
+    if (rememberDevice && password != null) {
+      _savedPassword = password;
+      await prefs.setString('slip_saved_password', password);
+    } else if (!rememberDevice) {
+      await prefs.remove('slip_saved_password');
+    }
+  }
 
   void updateTargetExams(List<String> exams) {
     if (exams.isEmpty) return;
@@ -355,41 +406,42 @@ class SupabaseService {
       }
     }
 
-    // 2. Network Sync / Delta Sync with Supabase
+    // 2. High-Efficiency Delta Sync: Query ONLY new records created after our latest cached item
     if (_client != null) {
       try {
-        final prefs = await SharedPreferences.getInstance();
-        final lastSyncIso = prefs.getString('slip_last_sync_timestamp');
-
-        var filterQuery = _client!.from('slips').select();
-
-        // Strict Paper Isolation
-        if (allowedPapers.length == 1) {
-          filterQuery = filterQuery.eq('exam_tag', allowedPapers.first);
-        } else if (allowedPapers.length > 1) {
-          filterQuery = filterQuery.inFilter('exam_tag', allowedPapers);
+        DateTime? latestCachedCreatedAt;
+        if (cachedFeed.isNotEmpty) {
+          for (final s in cachedFeed) {
+            if (latestCachedCreatedAt == null || s.createdAt.isAfter(latestCachedCreatedAt)) {
+              latestCachedCreatedAt = s.createdAt;
+            }
+          }
         }
 
-        // DELTA SYNC: If user already has cached data and a lastSync timestamp, only fetch new records!
-        if (lastSyncIso != null && cachedFeed.isNotEmpty) {
-          filterQuery = filterQuery.gt('created_at', lastSyncIso);
+        List<dynamic> list = [];
+        if (latestCachedCreatedAt != null) {
+          // Delta sync: fetch ONLY rows newer than our newest cached post
+          final response = await _client!
+              .from('slips')
+              .select()
+              .gt('created_at', latestCachedCreatedAt.toUtc().toIso8601String())
+              .order('created_at', ascending: false)
+              .limit(50);
+          list = response as List;
+        } else {
+          // Initial cold load: fetch the first page of 25 records
+          final response = await _client!
+              .from('slips')
+              .select()
+              .order('created_at', ascending: false)
+              .limit(25);
+          list = response as List;
         }
-
-        final response = await filterQuery.order('created_at', ascending: false).limit(60);
-        final list = response as List;
 
         if (list.isNotEmpty) {
-          DateTime? latestCreated;
           for (final item in list) {
             final slip = Slip.fromJson(item as Map<String, dynamic>);
             combinedMap[slip.id] = slip.copyWith(hasKept: savedIds.contains(slip.id));
-            if (latestCreated == null || slip.createdAt.isAfter(latestCreated)) {
-              latestCreated = slip.createdAt;
-            }
-          }
-
-          if (latestCreated != null) {
-            await prefs.setString('slip_last_sync_timestamp', latestCreated.toUtc().toIso8601String());
           }
 
           // Cache the updated feed for instant offline access
@@ -402,17 +454,18 @@ class SupabaseService {
       }
     }
 
-    // 3. Fallback to mock data if empty (first install with no network)
-    if (combinedMap.isEmpty) {
-      final mock = MockDataService.getInitialSlips();
-      for (final s in mock.where((m) => allowedPapers.contains(m.examTag))) {
-        combinedMap[s.id] = s;
-      }
-    }
-
-    // 4. Filter and Sort by createdAt descending (newest posts at top)
+    // 3. Filter and Sort by createdAt descending (newest posts at top)
     var result = combinedMap.values.toList();
     result.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    // Flexible Paper Filter using normalization so peer doubts are never lost
+    if (allowedPapers.isNotEmpty && !allowedPapers.contains('All')) {
+      final normSet = allowedPapers.map(GateSyllabus.normalizeExam).toSet();
+      result = result.where((s) {
+        if (s.examTag == null || s.examTag!.isEmpty) return true;
+        return normSet.contains(GateSyllabus.normalizeExam(s.examTag));
+      }).toList();
+    }
 
     if (postTypeFilter != null) {
       result = result.where((s) => s.postType == postTypeFilter).toList();
@@ -425,6 +478,44 @@ class SupabaseService {
     }
 
     return result;
+  }
+
+  // --- LAZY LOADING / CURSOR-BASED PAGINATION ---
+  Future<List<Slip>> fetchOlderSlips({
+    required DateTime beforeTimestamp,
+    int pageSize = 15,
+  }) async {
+    if (_client == null) return [];
+    try {
+      final savedIds = await getSavedSlipIds();
+      final response = await _client!
+          .from('slips')
+          .select()
+          .lt('created_at', beforeTimestamp.toUtc().toIso8601String())
+          .order('created_at', ascending: false)
+          .limit(pageSize);
+      final list = response as List;
+
+      if (list.isNotEmpty) {
+        final olderSlips = list.map((item) {
+          final slip = Slip.fromJson(item as Map<String, dynamic>);
+          return slip.copyWith(hasKept: savedIds.contains(slip.id));
+        }).toList();
+
+        // Append to cached feed
+        final cached = await loadCachedFeed();
+        final Map<String, Slip> combined = {for (final s in cached) s.id: s};
+        for (final s in olderSlips) {
+          combined[s.id] = s;
+        }
+        final updatedList = combined.values.toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        await saveCachedFeed(updatedList);
+
+        return olderSlips;
+      }
+    } catch (_) {}
+    return [];
   }
 
   Future<void> recordInteraction({
@@ -458,10 +549,9 @@ class SupabaseService {
 
     if (_client == null) return true;
     try {
-      String? validAuthorId;
-      if (slip.authorId != null && isUuid(slip.authorId!)) {
-        validAuthorId = slip.authorId;
-      }
+      final validAuthorId = (slip.authorId != null && isUuid(slip.authorId!))
+          ? slip.authorId!
+          : ((_currentUserId != null && isUuid(_currentUserId!)) ? _currentUserId! : generateUuid());
 
       await _client!.from('slips').insert({
         'id': slip.id,
@@ -475,6 +565,7 @@ class SupabaseService {
         'trap_statement': slip.trapStatement,
         'fix_statement': slip.fixStatement,
         'scratchpad_image_url': slip.imageUris.isNotEmpty ? slip.imageUris.first : null,
+        'voice_audio_url': slip.voiceAudioUrl,
         'author_id': validAuthorId,
         'author_handle': slip.authorUsername ?? _currentUsername ?? 'peer',
         'audio_duration_seconds': slip.audioDurationSeconds,
@@ -589,15 +680,18 @@ class SupabaseService {
   Future<bool> postComment({
     required String slipId,
     required String body,
+    String? parentId,
     bool isAcceptedAnswer = false,
   }) async {
     final comment = {
       'id': generateUuid(),
       'slip_id': slipId,
+      if (parentId != null) 'parent_id': parentId,
+      'author_id': _currentUserId,
       'author_handle': _currentUsername ?? 'peer',
       'body': body,
       'is_accepted_answer': isAcceptedAnswer,
-      'created_at': DateTime.now().toIso8601String(),
+      'created_at': DateTime.now().toUtc().toIso8601String(),
     };
 
     _localCommentsCache.putIfAbsent(slipId, () => []).add(comment);

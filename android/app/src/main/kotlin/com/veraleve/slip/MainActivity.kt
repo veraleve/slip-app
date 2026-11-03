@@ -18,15 +18,24 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.io.FileOutputStream
+import android.media.MediaRecorder
+import android.media.MediaPlayer
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.veraleve.slip/native"
     private val NOTIFICATION_CHANNEL_ID = "slip_blunders"
     private val PERMISSION_REQUEST_CODE = 1001
     private val CAMERA_REQUEST_CODE = 1002
+    private val AUDIO_PERMISSION_REQUEST_CODE = 1003
 
     private var pendingPermissionResult: MethodChannel.Result? = null
     private var pendingCameraResult: MethodChannel.Result? = null
+    private var cameraPhotoFile: File? = null
+
+    // Native Audio Engine
+    private var mediaRecorder: MediaRecorder? = null
+    private var mediaPlayer: MediaPlayer? = null
+    private var currentAudioRecordingFile: File? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -53,6 +62,31 @@ class MainActivity : FlutterActivity() {
                     pendingCameraResult = result
                     launchCameraIntent()
                 }
+                "startAudioRecording" -> {
+                    if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), AUDIO_PERMISSION_REQUEST_CODE)
+                        result.success(false)
+                    } else {
+                        val success = startRecordingAudio()
+                        result.success(success)
+                    }
+                }
+                "stopAudioRecording" -> {
+                    val path = stopRecordingAudio()
+                    result.success(path)
+                }
+                "playAudio" -> {
+                    val path = call.argument<String>("path")
+                    val success = playAudioFile(path)
+                    result.success(success)
+                }
+                "stopAudio" -> {
+                    stopPlayingAudio()
+                    result.success(true)
+                }
+                "isAudioPlaying" -> {
+                    result.success(mediaPlayer?.isPlaying == true)
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -76,6 +110,7 @@ class MainActivity : FlutterActivity() {
 
     private fun checkCurrentPermissions(): Map<String, Boolean> {
         val hasCamera = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        val hasMic = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         val hasNotifications = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         } else {
@@ -90,6 +125,7 @@ class MainActivity : FlutterActivity() {
 
         return mapOf(
             "camera" to hasCamera,
+            "mic" to hasMic,
             "notifications" to hasNotifications,
             "bluetooth" to hasBluetooth
         )
@@ -100,6 +136,10 @@ class MainActivity : FlutterActivity() {
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             permissions.add(Manifest.permission.CAMERA)
+        }
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            permissions.add(Manifest.permission.RECORD_AUDIO)
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -161,11 +201,28 @@ class MainActivity : FlutterActivity() {
             return
         }
 
-        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        if (intent.resolveActivity(packageManager) != null) {
-            startActivityForResult(intent, CAMERA_REQUEST_CODE)
-        } else {
-            pendingCameraResult?.error("NO_CAMERA", "No camera application found on device", null)
+        try {
+            val photoFile = File(cacheDir, "slip_scratchpad_${System.currentTimeMillis()}.jpg")
+            cameraPhotoFile = photoFile
+            val photoURI = androidx.core.content.FileProvider.getUriForFile(
+                this,
+                "${applicationContext.packageName}.fileprovider",
+                photoFile
+            )
+
+            val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+                putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
+                addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+
+            if (intent.resolveActivity(packageManager) != null) {
+                startActivityForResult(intent, CAMERA_REQUEST_CODE)
+            } else {
+                pendingCameraResult?.error("NO_CAMERA", "No camera application found on device", null)
+                pendingCameraResult = null
+            }
+        } catch (e: Exception) {
+            pendingCameraResult?.error("CAMERA_ERROR", e.localizedMessage, null)
             pendingCameraResult = null
         }
     }
@@ -173,18 +230,36 @@ class MainActivity : FlutterActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == CAMERA_REQUEST_CODE) {
-            if (resultCode == RESULT_OK && data != null) {
-                val bitmap = data.extras?.get("data") as? Bitmap
-                if (bitmap != null) {
+            if (resultCode == RESULT_OK) {
+                val file = cameraPhotoFile
+                if (file != null && file.exists() && file.length() > 0) {
                     try {
-                        val file = File(cacheDir, "slip_blunder_${System.currentTimeMillis()}.jpg")
-                        val out = FileOutputStream(file)
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
-                        out.flush()
-                        out.close()
+                        // Gentle compression: scale only if gigantic (above 2048px), preserving full handwriting and formula readability
+                        val options = android.graphics.BitmapFactory.Options().apply {
+                            inJustDecodeBounds = true
+                        }
+                        android.graphics.BitmapFactory.decodeFile(file.absolutePath, options)
+
+                        var sampleSize = 1
+                        val maxDim = 2048 // Full HD+ ensures formulas, superscripts and subscript letters are crisp
+                        while (options.outWidth / sampleSize > maxDim || options.outHeight / sampleSize > maxDim) {
+                            sampleSize *= 2
+                        }
+
+                        val decodeOptions = android.graphics.BitmapFactory.Options().apply {
+                            inSampleSize = sampleSize
+                        }
+                        val fullBitmap = android.graphics.BitmapFactory.decodeFile(file.absolutePath, decodeOptions)
+                        if (fullBitmap != null) {
+                            val out = FileOutputStream(file)
+                            // 92% quality preserves every letter and equation cleanly without artifacting
+                            fullBitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)
+                            out.flush()
+                            out.close()
+                        }
                         pendingCameraResult?.success(file.absolutePath)
-                    } catch (e: Exception) {
-                        pendingCameraResult?.error("SAVE_FAILED", e.localizedMessage, null)
+                    } catch (_: Exception) {
+                        pendingCameraResult?.success(file.absolutePath)
                     }
                 } else {
                     pendingCameraResult?.success(null)
@@ -194,5 +269,80 @@ class MainActivity : FlutterActivity() {
             }
             pendingCameraResult = null
         }
+    }
+
+    private fun startRecordingAudio(): Boolean {
+        return try {
+            val audioDir = File(cacheDir, "audio_notes").apply { mkdirs() }
+            val audioFile = File(audioDir, "audio_${System.currentTimeMillis()}.m4a")
+            currentAudioRecordingFile = audioFile
+
+            mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                MediaRecorder(this)
+            } else {
+                @Suppress("DEPRECATION")
+                MediaRecorder()
+            }.apply {
+                setAudioSource(MediaRecorder.AudioSource.MIC)
+                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                setAudioEncodingBitRate(64000)
+                setAudioSamplingRate(44100)
+                setOutputFile(audioFile.absolutePath)
+                prepare()
+                start()
+            }
+            true
+        } catch (_: Exception) {
+            mediaRecorder?.release()
+            mediaRecorder = null
+            false
+        }
+    }
+
+    private fun stopRecordingAudio(): String? {
+        return try {
+            mediaRecorder?.stop()
+            mediaRecorder?.release()
+            mediaRecorder = null
+            currentAudioRecordingFile?.absolutePath
+        } catch (_: Exception) {
+            mediaRecorder?.release()
+            mediaRecorder = null
+            null
+        }
+    }
+
+    private fun playAudioFile(path: String?): Boolean {
+        if (path == null) return false
+        val file = File(path)
+        if (!file.exists()) return false
+
+        return try {
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+            mediaPlayer = MediaPlayer().apply {
+                setDataSource(file.absolutePath)
+                prepare()
+                start()
+                setOnCompletionListener {
+                    it.release()
+                    mediaPlayer = null
+                }
+            }
+            true
+        } catch (_: Exception) {
+            mediaPlayer?.release()
+            mediaPlayer = null
+            false
+        }
+    }
+
+    private fun stopPlayingAudio() {
+        try {
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+        } catch (_: Exception) {}
+        mediaPlayer = null
     }
 }

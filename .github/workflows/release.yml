@@ -40,7 +40,9 @@ jobs:
         run: flutter pub get
 
       - name: Build APK (Release)
-        run: flutter build apk --release --no-shrink --dart-define=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" --dart-define=SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+        run: |
+          flutter build apk --release --no-shrink --dart-define=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" --dart-define=SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/slip.apk
 
       - name: Determine Tag
         id: get_tag
@@ -54,8 +56,8 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: slip-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: slip-apk
+          path: build/app/outputs/flutter-apk/slip.apk
 
       - name: Publish Official GitHub Release
         uses: softprops/action-gh-release@v2
@@ -68,10 +70,10 @@ jobs:
             ### Automated Open-Source Release
             - Built with Flutter 3.24.5 on Ubuntu Runner
             - Integrated with `slip-backend` Supabase (ap-south-1 Mumbai)
-            - Features: The Stream feed, baseline inputs, audio waveforms, `Same` / `The Fix` interactions
+            - Features: Reddit-style post details, threaded comments with OP Author chip, native audio recording/playback, Google Tasks redesign with elevated FAB, delta sync & lazy loading, curved UI.
             
-            **Direct Download:** `slip-release.apk`
-          files: build/app/outputs/flutter-apk/app-release.apk
+            **Direct Download:** `slip.apk`
+          files: build/app/outputs/flutter-apk/slip.apk
           draft: false
           prerelease: false
         env:

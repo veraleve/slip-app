@@ -62,6 +62,7 @@ class _SlipAppState extends State<SlipApp> {
   }
 
   void _onSplashComplete() {
+    _checkInitialAuth();
     setState(() {
       _showSplash = false;
     });

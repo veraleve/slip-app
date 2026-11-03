@@ -16,6 +16,7 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   bool _isSignUp = false;
   bool _isLoading = false;
+  bool _rememberDevice = true;
   String? _errorMessage;
 
   final TextEditingController _usernameController = TextEditingController();
@@ -23,6 +24,15 @@ class _AuthScreenState extends State<AuthScreen> {
   
   // A student can select 1 or 2 papers (e.g. CS + DA, EC + EE)
   final Set<String> _selectedExams = {GateSyllabus.gateCS};
+
+  @override
+  void initState() {
+    super.initState();
+    final saved = SupabaseService().savedUsername;
+    if (saved != null && saved.isNotEmpty) {
+      _usernameController.text = saved;
+    }
+  }
 
   @override
   void dispose() {
@@ -66,6 +76,12 @@ class _AuthScreenState extends State<AuthScreen> {
     setState(() => _isLoading = false);
 
     if (success) {
+      await service.setLoggedIn(
+        true,
+        rememberDevice: _rememberDevice,
+        username: username,
+        password: password,
+      );
       widget.onAuthenticated();
     } else {
       setState(() => _errorMessage = 'COULD NOT INITIALIZE PEER MESH.');
@@ -107,6 +123,12 @@ class _AuthScreenState extends State<AuthScreen> {
     setState(() => _isLoading = false);
 
     if (success) {
+      await service.setLoggedIn(
+        true,
+        rememberDevice: _rememberDevice,
+        username: username,
+        password: password,
+      );
       widget.onAuthenticated();
     } else {
       setState(() {
@@ -138,11 +160,13 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                   ),
                   const SizedBox(height: 6),
-                  Text(
-                    'Learn from peer blunders · Inoculate before the exam',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: SlipTheme.steel,
-                        ),
+                  const Text(
+                    'Ask doubts. Learn from mistakes. Master together',
+                    style: TextStyle(
+                      color: SlipTheme.steel,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                   const SizedBox(height: 32),
 
@@ -323,6 +347,37 @@ class _AuthScreenState extends State<AuthScreen> {
                     controller: _passwordController,
                   ),
 
+                  const SizedBox(height: 12),
+
+                  // Remember This Device Checkbox
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: Checkbox(
+                          value: _rememberDevice,
+                          activeColor: SlipTheme.carbon,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          onChanged: (val) {
+                            setState(() => _rememberDevice = val ?? true);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Remember this device',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: SlipTheme.carbon,
+                        ),
+                      ),
+                    ],
+                  ),
+
                   if (_errorMessage != null) ...[
                     const SizedBox(height: 12),
                     Text(
@@ -334,20 +389,20 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                   ],
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
 
                   // Sign In / Create Account Button
                   SizedBox(
                     width: double.infinity,
-                    height: 44,
-                    child: OutlinedButton(
+                    height: 46,
+                    child: ElevatedButton(
                       onPressed: _isLoading ? null : _handleAuth,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: SlipTheme.carbon,
-                        side:
-                            const BorderSide(color: SlipTheme.carbon, width: 1),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: SlipTheme.carbon,
+                        foregroundColor: SlipTheme.canvas,
+                        elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(3),
+                          borderRadius: BorderRadius.circular(14),
                         ),
                       ),
                       child: Text(
@@ -355,6 +410,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         style:
                             Theme.of(context).textTheme.labelMedium?.copyWith(
                                   fontWeight: FontWeight.w700,
+                                  color: SlipTheme.canvas,
                                   letterSpacing: 0.6,
                                 ),
                       ),

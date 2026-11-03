@@ -4,7 +4,7 @@ import '../theme/slip_theme.dart';
 import '../widgets/nav_dock.dart';
 import 'drop_slip_screen.dart';
 import 'profile_screen.dart';
-import 'stream_screen.dart';
+import 'feed_screen.dart';
 import 'tasks_screen.dart';
 
 class MainScaffold extends StatefulWidget {
@@ -41,37 +41,24 @@ class _MainScaffoldState extends State<MainScaffold> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: SlipTheme.canvas,
-      body: Stack(
+      body: IndexedStack(
+        index: _slipProvider.activeTabIndex,
         children: [
-          // Active Screen
-          Positioned.fill(
-            child: IndexedStack(
-              index: _slipProvider.activeTabIndex,
-              children: [
-                StreamScreen(provider: _slipProvider),
-                DropSlipScreen(provider: _slipProvider),
-                TasksScreen(provider: _slipProvider),
-                ProfileScreen(
-                  provider: _slipProvider,
-                  onSignOut: widget.onSignOut,
-                ),
-              ],
-            ),
-          ),
-
-          // Floating Bottom Navigation Dock
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: NavDock(
-              activeIndex: _slipProvider.activeTabIndex,
-              onTabSelected: (index) {
-                _slipProvider.setTabIndex(index);
-              },
-            ),
+          FeedScreen(provider: _slipProvider),
+          DropSlipScreen(provider: _slipProvider),
+          TasksScreen(provider: _slipProvider),
+          ProfileScreen(
+            provider: _slipProvider,
+            onSignOut: widget.onSignOut,
           ),
         ],
+      ),
+      // Instagram-style bottom navigation fully down at the bottom of the screen
+      bottomNavigationBar: NavDock(
+        activeIndex: _slipProvider.activeTabIndex,
+        onTabSelected: (index) {
+          _slipProvider.setTabIndex(index);
+        },
       ),
     );
   }

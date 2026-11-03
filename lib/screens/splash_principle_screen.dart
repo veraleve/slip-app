@@ -116,15 +116,15 @@ class _SplashPrincipleScreenState extends State<SplashPrincipleScreen>
 
                     // Minimalist Core Principle
                     Text(
-                      'Ask doubts. Learn from others’ mistakes.\nMaster the concepts together before the exam.',
+                      'Ask doubts. Learn from mistakes. Master together',
                       textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: SlipTheme.carbon,
-                            fontSize: 16.5,
-                            height: 1.5,
-                            letterSpacing: -0.2,
-                          ),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: SlipTheme.steel,
+                        fontSize: 13.5,
+                        height: 1.4,
+                        letterSpacing: -0.1,
+                      ),
                     ),
 
                     const Spacer(flex: 4),

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/slip.dart';
+import '../providers/slip_provider.dart';
+import '../screens/post_detail_screen.dart';
+import '../screens/profile_screen.dart';
 import '../theme/slip_theme.dart';
 import 'audio_waveform_strip.dart';
-import 'comment_thread_sheet.dart';
 import 'image_gallery_grid.dart';
 
 class SlipCard extends StatefulWidget {
@@ -14,6 +16,7 @@ class SlipCard extends StatefulWidget {
   final VoidCallback onKeepTap;
   final VoidCallback onSolveTap;
   final VoidCallback onPassTap;
+  final SlipProvider? provider;
 
   const SlipCard({
     super.key,
@@ -24,6 +27,8 @@ class SlipCard extends StatefulWidget {
     required this.onKeepTap,
     required this.onSolveTap,
     required this.onPassTap,
+    this.provider,
+  });
   });
 
   @override
@@ -74,7 +79,7 @@ class _SlipCardState extends State<SlipCard> {
               Row(
                 children: [
                   GestureDetector(
-                    onTap: () => _showPeerProfileModal(
+                    onTap: () => _openFullProfile(
                       context,
                       slip.authorUsername ?? 'peer',
                       slip.examTag,
@@ -295,6 +300,7 @@ class _SlipCardState extends State<SlipCard> {
             const SizedBox(height: 10),
             AudioWaveformStrip(
               totalSeconds: slip.audioDurationSeconds,
+              audioUrl: slip.voiceAudioUrl,
               studentTranscript: isDoubt
                   ? 'Voice explanation (${slip.audioDurationSeconds}s)'
                   : 'Audio blunder note (${slip.audioDurationSeconds}s)',
@@ -504,201 +510,17 @@ class _SlipCardState extends State<SlipCard> {
     );
   }
 
-  void _showPeerProfileModal(BuildContext context, String handle, String examTag) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: SlipTheme.canvas,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
-      ),
-      builder: (ctx) {
-        final examClean = examTag.replaceAll('GATE ', '');
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top handle & close
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            color: SlipTheme.carbon.withOpacity(0.08),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text(
-                              handle.substring(0, 1).toUpperCase(),
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: SlipTheme.carbon,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '@$handle',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: SlipTheme.carbon,
-                              ),
-                            ),
-                            Text(
-                              'GATE ASPIRANT · $examClean',
-                              style: const TextStyle(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w700,
-                                color: SlipTheme.steel,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 20),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: () => Navigator.of(ctx).pop(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Divider(color: SlipTheme.hairline, height: 1),
-                const SizedBox(height: 14),
-
-                // Real Peer Stats
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _PeerStat(value: '18', label: 'SHARED', sub: 'PUBLIC TRAPS'),
-                    _PeerStat(value: '42', label: 'CLEARED', sub: 'MASTERED', color: SlipTheme.clearedGreen),
-                    _PeerStat(value: '29', label: 'SAVED', sub: 'REVISION'),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Divider(color: SlipTheme.hairline, height: 1),
-                const SizedBox(height: 12),
-
-                // Public blunders header
-                Text(
-                  'PUBLIC BLUNDERS BY @$handle',
-                  style: const TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.6,
-                    color: SlipTheme.steel,
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                // Active slip preview as peer's public contribution
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: SlipTheme.surface,
-                    border: Border.all(color: SlipTheme.hairline, width: 0.8),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            widget.slip.topic,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: SlipTheme.carbon,
-                            ),
-                          ),
-                          const Text(
-                            'PUBLIC INOCULATION',
-                            style: TextStyle(
-                              fontSize: 8.5,
-                              fontWeight: FontWeight.w700,
-                              color: SlipTheme.clearedGreen,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        widget.slip.trapStatement,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: SlipTheme.carbon,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'FIX: ${widget.slip.fixStatement}',
-                        style: const TextStyle(fontSize: 11, color: SlipTheme.steel),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _PeerStat extends StatelessWidget {
-  final String value;
-  final String label;
-  final String sub;
-  final Color? color;
-
-  const _PeerStat({
-    required this.value,
-    required this.label,
-    required this.sub,
-    this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-            color: color ?? SlipTheme.carbon,
+  void _openFullProfile(BuildContext context, String handle, String examTag) {
+    if (widget.provider != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ProfileScreen(
+            provider: widget.provider!,
+            targetUsername: handle,
+            targetExamTag: examTag,
           ),
         ),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
-            color: SlipTheme.steel,
-          ),
-        ),
-      ],
-    );
+      );
+    }
   }
 }

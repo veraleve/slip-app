@@ -14,8 +14,16 @@ import 'settings_screen.dart';
 class ProfileScreen extends StatefulWidget {
   final SlipProvider provider;
   final VoidCallback? onSignOut;
+  final String? targetUsername;
+  final String? targetExamTag;
 
-  const ProfileScreen({super.key, required this.provider, this.onSignOut});
+  const ProfileScreen({
+    super.key,
+    required this.provider,
+    this.onSignOut,
+    this.targetUsername,
+    this.targetExamTag,
+  });
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -61,6 +69,206 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   bool get _allPermissionsGranted =>
       _permissions.values.isNotEmpty && _permissions.values.every((v) => v == true);
+
+  String _profileSearchQuery = '';
+  String? _profileSubjectFilter;
+
+  void _openSearchAndFilterDrawer() {
+    final searchController = TextEditingController(text: _profileSearchQuery);
+    String? tempSubject = _profileSubjectFilter;
+    final allSubjects = GateSyllabus.getSubjectsForExam(
+      widget.provider.userExams.isNotEmpty ? widget.provider.userExams.first : GateSyllabus.gateCS,
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: SlipTheme.canvas,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (sheetCtx, setSheetState) {
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 16,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        color: SlipTheme.hairline,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'SEARCH & FILTER PROFILE',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.6,
+                          color: SlipTheme.carbon,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Search by keyword, mistake, or doubt...',
+                      hintStyle: const TextStyle(fontSize: 13, color: SlipTheme.steel),
+                      prefixIcon: const Icon(Icons.search_rounded, size: 20, color: SlipTheme.steel),
+                      suffixIcon: searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, size: 16),
+                              onPressed: () {
+                                searchController.clear();
+                                setSheetState(() {});
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: SlipTheme.surface,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: SlipTheme.hairline, width: 0.8),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: SlipTheme.hairline, width: 0.8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: SlipTheme.carbon, width: 1.2),
+                      ),
+                    ),
+                    onChanged: (_) => setSheetState(() {}),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'SUBJECT FILTER',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: SlipTheme.steel,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('All Subjects', style: TextStyle(fontSize: 10.5)),
+                        selected: tempSubject == null,
+                        selectedColor: SlipTheme.carbon,
+                        backgroundColor: SlipTheme.surface,
+                        labelStyle: TextStyle(
+                          color: tempSubject == null ? SlipTheme.canvas : SlipTheme.carbon,
+                          fontWeight: tempSubject == null ? FontWeight.w700 : FontWeight.w500,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          side: const BorderSide(color: SlipTheme.hairline, width: 0.8),
+                        ),
+                        onSelected: (_) => setSheetState(() => tempSubject = null),
+                      ),
+                      ...allSubjects.map((s) {
+                        final isSel = tempSubject == s;
+                        return ChoiceChip(
+                          label: Text(s, style: const TextStyle(fontSize: 10.5)),
+                          selected: isSel,
+                          selectedColor: SlipTheme.carbon,
+                          backgroundColor: SlipTheme.surface,
+                          labelStyle: TextStyle(
+                            color: isSel ? SlipTheme.canvas : SlipTheme.carbon,
+                            fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            side: const BorderSide(color: SlipTheme.hairline, width: 0.8),
+                          ),
+                          onSelected: (_) => setSheetState(() => tempSubject = isSel ? null : s),
+                        );
+                      }),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            setState(() {
+                              _profileSearchQuery = '';
+                              _profileSubjectFilter = null;
+                            });
+                            Navigator.of(ctx).pop();
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: SlipTheme.steel,
+                            side: const BorderSide(color: SlipTheme.hairline, width: 0.8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: const Text('RESET', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              _profileSearchQuery = searchController.text.trim();
+                              _profileSubjectFilter = tempSubject;
+                            });
+                            Navigator.of(ctx).pop();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: SlipTheme.carbon,
+                            foregroundColor: SlipTheme.canvas,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: const Text('APPLY', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
   void _openSettings() {
     Navigator.of(context).push(
@@ -320,21 +528,58 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+  List<Slip> _filterList(List<Slip> list) {
+    return list.where((s) {
+      if (_profileSubjectFilter != null && _profileSubjectFilter!.isNotEmpty) {
+        if (s.topic.toLowerCase() != _profileSubjectFilter!.toLowerCase()) return false;
+      }
+      if (_profileSearchQuery.isNotEmpty) {
+        final q = _profileSearchQuery.toLowerCase();
+        final matchTopic = s.topic.toLowerCase().contains(q);
+        final matchSubtopic = (s.subtopic ?? '').toLowerCase().contains(q);
+        final matchTrap = s.trapStatement.toLowerCase().contains(q);
+        final matchFix = s.fixStatement.toLowerCase().contains(q);
+        final matchTitle = (s.title ?? '').toLowerCase().contains(q);
+        if (!matchTopic && !matchSubtopic && !matchTrap && !matchFix && !matchTitle) return false;
+      }
+      return true;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final service = SupabaseService();
-    final username = service.currentUsername ?? 'peer_anonymous';
+    final currentUsername = service.currentUsername ?? 'peer_anonymous';
     final userExams = service.targetExams;
     final currentUserId = service.currentUserId;
 
-    // Filter slips for each tab
-    final sharedSlips = widget.provider.slips
-        .where((s) => s.authorId != null && s.authorId == currentUserId)
-        .toList();
-    final clearedSlips =
-        widget.provider.slips.where((s) => s.hasCleared).toList();
-    final savedSlips =
-        widget.provider.slips.where((s) => s.hasKept).toList();
+    final isOwnProfile = widget.targetUsername == null || widget.targetUsername == currentUsername;
+    final displayUsername = isOwnProfile ? currentUsername : widget.targetUsername!;
+    final initial = displayUsername.isNotEmpty ? displayUsername.substring(0, 1).toUpperCase() : 'P';
+
+    // Filter slips for each tab using allSlips so active topic filters don't hide profile posts
+    final allSlips = widget.provider.allSlips;
+    final authorSlips = allSlips.where((s) {
+      if (isOwnProfile) {
+        final matchesId = currentUserId != null && s.authorId == currentUserId;
+        final matchesHandle = s.authorUsername != null && s.authorUsername == currentUsername;
+        return matchesId || matchesHandle;
+      } else {
+        return s.authorUsername == widget.targetUsername;
+      }
+    }).toList();
+
+    final filteredAuthorSlips = _filterList(authorSlips);
+    final sharedSlips = filteredAuthorSlips;
+    final clearedSlips = _filterList(isOwnProfile
+        ? allSlips.where((s) => s.hasCleared).toList()
+        : authorSlips.where((s) => s.hasCleared).toList());
+    final savedSlips = _filterList(isOwnProfile
+        ? allSlips.where((s) => s.hasKept).toList()
+        : authorSlips.where((s) => s.hasKept).toList());
+
+    final sharedDoubtsCount = sharedSlips.where((s) => s.postType == PostType.doubt).length;
+    final sharedMistakesCount = sharedSlips.where((s) => s.postType == PostType.mistake).length;
 
     return Scaffold(
       backgroundColor: SlipTheme.canvas,
@@ -348,104 +593,166 @@ class _ProfileScreenState extends State<ProfileScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 1. Instagram-Style Top Bar: Handle, Paper Chip, and Settings Gear Icon
+                      // 1. Instagram-Style Top Bar: Back (if peer), Title, Search & Filter Menu, and Settings
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          Row(
                             children: [
+                              if (!isOwnProfile) ...[
+                                IconButton(
+                                  icon: const Icon(Icons.arrow_back_rounded, size: 22, color: SlipTheme.carbon),
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  visualDensity: VisualDensity.compact,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
                               Text(
-                                '@$username',
+                                '@$displayUsername',
                                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                       fontWeight: FontWeight.w800,
                                       color: SlipTheme.carbon,
                                       letterSpacing: -0.5,
                                     ),
                               ),
-                              const SizedBox(height: 2),
-                              Row(
-                                children: [
-                                  Text(
-                                    'GATE ASPIRANT',
-                                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                          color: SlipTheme.steel,
-                                          fontSize: 9.5,
-                                          letterSpacing: 0.8,
-                                        ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                    decoration: BoxDecoration(
-                                      color: SlipTheme.carbon.withOpacity(0.06),
-                                      borderRadius: BorderRadius.circular(2),
-                                    ),
-                                    child: Text(
-                                      userExams.map((e) => e.replaceAll('GATE ', '')).join(' + '),
-                                      style: const TextStyle(
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w700,
-                                        color: SlipTheme.carbon,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
                             ],
                           ),
-
-                          // Settings Gear Icon (Instagram Style)
-                          IconButton(
-                            onPressed: _openSettings,
-                            icon: const Icon(
-                              Icons.settings_outlined,
-                              size: 22,
-                              color: SlipTheme.carbon,
-                            ),
-                            tooltip: 'Settings',
-                            visualDensity: VisualDensity.compact,
+                          Row(
+                            children: [
+                              // 3-horizontal-lines Search & Filter Menu Icon
+                              IconButton(
+                                onPressed: _openSearchAndFilterDrawer,
+                                icon: const Icon(
+                                  Icons.menu_rounded,
+                                  size: 24,
+                                  color: SlipTheme.carbon,
+                                ),
+                                tooltip: 'Search & Filter',
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              if (isOwnProfile)
+                                IconButton(
+                                  onPressed: _openSettings,
+                                  icon: const Icon(
+                                    Icons.settings_outlined,
+                                    size: 22,
+                                    color: SlipTheme.carbon,
+                                  ),
+                                  tooltip: 'Settings',
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                            ],
                           ),
                         ],
                       ),
-                      const SizedBox(height: 18),
-                      const Divider(color: SlipTheme.hairline, height: 1),
                       const SizedBox(height: 16),
 
-                      // 2. Real Numbers / Living Stats Row
+                      // 2. Instagram-Style Avatar + Stats Row
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _StatBlock(
-                            label: 'SHARED',
-                            value: sharedSlips.length.toString(),
-                            sublabel: 'POSTS',
+                          // Instagram circular avatar with user initial
+                          Container(
+                            width: 68,
+                            height: 68,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: SlipTheme.surface,
+                              border: Border.all(color: SlipTheme.hairline, width: 2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.04),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Text(
+                                initial,
+                                style: const TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w800,
+                                  color: SlipTheme.carbon,
+                                ),
+                              ),
+                            ),
                           ),
-                          _StatBlock(
-                            label: 'CLEARED',
-                            value: clearedSlips.length.toString(),
-                            sublabel: 'MASTERED',
-                            color: SlipTheme.clearedGreen,
+                          const SizedBox(width: 18),
+
+                          // Living Stats Row (SHARED | CLEARED | SAVED)
+                          Expanded(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                _StatBlock(
+                                  label: 'SHARED',
+                                  value: sharedSlips.length.toString(),
+                                  sublabel: '$sharedDoubtsCount DOUBTS · $sharedMistakesCount MISTAKES',
+                                ),
+                                _StatBlock(
+                                  label: 'CLEARED',
+                                  value: clearedSlips.length.toString(),
+                                  sublabel: 'MASTERED',
+                                  color: SlipTheme.clearedGreen,
+                                ),
+                                _StatBlock(
+                                  label: 'SAVED',
+                                  value: savedSlips.length.toString(),
+                                  sublabel: 'REVISION',
+                                ),
+                              ],
+                            ),
                           ),
-                          _StatBlock(
-                            label: 'SAVED',
-                            value: savedSlips.length.toString(),
-                            sublabel: 'REVISION',
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 3. User Badge & Syllabus Tag Underneath
+                      Row(
+                        children: [
+                          Text(
+                            'GATE ASPIRANT',
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: SlipTheme.steel,
+                                  fontSize: 9.5,
+                                  letterSpacing: 0.8,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: SlipTheme.carbon.withOpacity(0.06),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              isOwnProfile
+                                  ? userExams.map((e) => e.replaceAll('GATE ', '')).join(' + ')
+                                  : (widget.targetExamTag ?? 'CS').replaceAll('GATE ', ''),
+                              style: const TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: SlipTheme.carbon,
+                              ),
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
                       const Divider(color: SlipTheme.hairline, height: 1),
 
-                      // 3. Auto-hiding Permissions Banner (hides when all permissions are granted!)
-                      if (!_allPermissionsGranted) ...[
+                      // 4. Auto-hiding Permissions Banner (Own Profile only)
+                      if (isOwnProfile && !_allPermissionsGranted) ...[
                         const SizedBox(height: 14),
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: SlipTheme.surface,
                             border: Border.all(color: SlipTheme.hairline, width: 0.8),
-                            borderRadius: BorderRadius.circular(3),
+                            borderRadius: BorderRadius.circular(14),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -948,11 +1255,12 @@ class _StatBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           value,
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontSize: 22,
+                fontSize: 21,
                 fontWeight: FontWeight.w800,
                 color: color ?? SlipTheme.carbon,
               ),
@@ -967,6 +1275,18 @@ class _StatBlock extends StatelessWidget {
                 letterSpacing: 0.6,
               ),
         ),
+        if (sublabel.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(
+            sublabel,
+            style: const TextStyle(
+              fontSize: 8,
+              fontWeight: FontWeight.w600,
+              color: SlipTheme.steel,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -981,10 +1301,10 @@ class _MiniPermPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: ok ? SlipTheme.clearedGreen.withOpacity(0.08) : SlipTheme.trapRed.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(2),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

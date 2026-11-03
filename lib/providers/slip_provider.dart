@@ -12,14 +12,19 @@ class SlipProvider extends ChangeNotifier {
   bool _isLoading = false;
   int _activeTabIndex = 0;
   String _selectedExamFilter = 'All';
-  String _selectedTopicFilter = 'For You';
+  String _selectedTopicFilter = 'All';
   String _selectedSubjectFilter = 'All';
   String _selectedSubtopicFilter = 'All Topics';
+  PostType? _selectedPostTypeFilter;
 
   List<Slip> get slips {
     var result = _slips;
     if (_selectedExamFilter != 'All') {
       result = result.where((s) => s.examTag == _selectedExamFilter).toList();
+    }
+
+    if (_selectedPostTypeFilter != null) {
+      result = result.where((s) => s.postType == _selectedPostTypeFilter).toList();
     }
 
     if (_selectedSubjectFilter != 'All') {
@@ -30,24 +35,7 @@ class SlipProvider extends ChangeNotifier {
       result = result.where((s) => s.subtopic == _selectedSubtopicFilter).toList();
     }
 
-    if (_selectedTopicFilter == 'For You') {
-      // Prioritize fresh posts and recommended peer blunders & doubts
-      final recs = List<Slip>.from(result);
-      final now = DateTime.now();
-      recs.sort((a, b) {
-        final hoursA = now.difference(a.createdAt).inHours;
-        final hoursB = now.difference(b.createdAt).inHours;
-        // Strong recency boost: brand-new posts appear directly at top
-        final freshA = hoursA < 1 ? 500 : (hoursA < 6 ? 200 : (hoursA < 24 ? 60 : 0));
-        final freshB = hoursB < 1 ? 500 : (hoursB < 6 ? 200 : (hoursB < 24 ? 60 : 0));
-
-        final aScore = freshA + (a.sameCount * 2) + (a.keepCount * 3) - (a.hasCleared ? 20 : 0);
-        final bScore = freshB + (b.sameCount * 2) + (b.keepCount * 3) - (b.hasCleared ? 20 : 0);
-        if (aScore != bScore) return bScore.compareTo(aScore);
-        return b.createdAt.compareTo(a.createdAt);
-      });
-      return recs;
-    } else if (_selectedTopicFilter != 'All' && _selectedSubjectFilter == 'All') {
+    if (_selectedTopicFilter != 'All' && _selectedSubjectFilter == 'All') {
       result = result.where((s) => s.topic == _selectedTopicFilter).toList();
     }
 
@@ -63,11 +51,41 @@ class SlipProvider extends ChangeNotifier {
   String get selectedTopicFilter => _selectedTopicFilter;
   String get selectedSubjectFilter => _selectedSubjectFilter;
   String get selectedSubtopicFilter => _selectedSubtopicFilter;
+  PostType? get selectedPostTypeFilter => _selectedPostTypeFilter;
   List<String> get userExams => _service.targetExams;
   String? get currentUserId => _service.currentUserId;
+  String? get currentUsername => _service.currentUsername;
+  List<Slip> get allSlips => List.unmodifiable(_slips);
 
-  // Counts for profile
-  int get sharedCount => _slips.where((s) => s.authorId != null).length;
+  // Counts for profile (accurately reflects user's own doubts & blunders)
+  int get sharedCount {
+    final uid = _service.currentUserId;
+    final uname = _service.currentUsername;
+    return _slips.where((s) {
+      final matchesId = uid != null && s.authorId == uid;
+      final matchesName = uname != null && s.authorUsername == uname;
+      return matchesId || matchesName;
+    }).length;
+  }
+
+  int get sharedDoubtsCount {
+    final uid = _service.currentUserId;
+    final uname = _service.currentUsername;
+    return _slips.where((s) {
+      final isAuthor = (uid != null && s.authorId == uid) || (uname != null && s.authorUsername == uname);
+      return isAuthor && s.postType == PostType.doubt;
+    }).length;
+  }
+
+  int get sharedMistakesCount {
+    final uid = _service.currentUserId;
+    final uname = _service.currentUsername;
+    return _slips.where((s) {
+      final isAuthor = (uid != null && s.authorId == uid) || (uname != null && s.authorUsername == uname);
+      return isAuthor && s.postType == PostType.mistake;
+    }).length;
+  }
+
   int get clearedCount => _slips.where((s) => s.hasCleared).length;
   int get savedCount => _slips.where((s) => s.hasKept).length;
 
@@ -77,6 +95,15 @@ class SlipProvider extends ChangeNotifier {
     // Strictly isolate to the user's registered papers
     _slips = await _service.fetchStream(userPapers: _service.targetExams);
     await _loadTasks();
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  Future<void> refreshStream() async {
+    _isLoading = true;
+    notifyListeners();
+    final allowedPapers = _selectedExamFilter == 'All' ? null : [_selectedExamFilter];
+    _slips = await _service.fetchStream(userPapers: allowedPapers);
     _isLoading = false;
     notifyListeners();
   }
@@ -94,20 +121,8 @@ class SlipProvider extends ChangeNotifier {
       _tasks = raw.map((str) => TaskItem.deserialize(str)).toList();
       _tasks.sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
     } else {
-      // Default initial mock test reminder
-      final userExams = _service.targetExams;
-      final primary = userExams.isNotEmpty ? userExams.first : 'GATE CS';
-      _tasks = [
-        TaskItem(
-          id: 'task-init-01',
-          title: 'Full Length Mock Test 1',
-          examTag: primary,
-          subject: 'Linear Algebra',
-          topics: ['Eigenvalues & Eigenvectors', 'Matrices & Determinants'],
-          scheduledAt: DateTime.now().add(const Duration(days: 2, hours: 4)),
-          createdAt: DateTime.now(),
-        ),
-      ];
+      // Empty slate (no placeholder tasks)
+      _tasks = [];
       await _persistTasks();
     }
   }
@@ -199,16 +214,16 @@ class SlipProvider extends ChangeNotifier {
   // Includes blunders authored by user AND blunders saved by user from peers
   List<Slip> getBlundersForTask(TaskItem task) {
     return _slips.where((slip) {
-      // Match exam
-      if (slip.examTag != task.examTag) return false;
-
       // Must be a blunder/mistake OR saved by user from peer feed
       final isBlunder = slip.postType == PostType.mistake || slip.hasKept;
       if (!isBlunder) return false;
 
-      // Match subject
+      // Match subject or title keywords
       final matchesSubject = slip.topic.trim().toLowerCase() == task.subject.trim().toLowerCase();
-      if (!matchesSubject) return false;
+      final matchesTitle = task.title.toLowerCase().contains(slip.topic.toLowerCase()) ||
+          (slip.subtopic != null && task.title.toLowerCase().contains(slip.subtopic!.toLowerCase()));
+
+      if (!matchesSubject && !matchesTitle) return false;
 
       // If task has specific subtopics (not empty, and not 'All Topics')
       if (task.topics.isNotEmpty && !task.topics.contains('All Topics')) {
@@ -311,6 +326,29 @@ class SlipProvider extends ChangeNotifier {
       keepCount: newCount < 0 ? 0 : newCount,
     );
     _slips[index] = updated;
+
+    // If user is saving someone else's blunder, auto-record a task in Tasks if no active task matches
+    if (newState) {
+      final hasMatchingTask = _tasks.any((t) =>
+          !t.isCompleted &&
+          (t.subject.trim().toLowerCase() == updated.topic.trim().toLowerCase() ||
+              t.title.toLowerCase().contains(updated.topic.toLowerCase())));
+      if (!hasMatchingTask) {
+        final autoTask = TaskItem(
+          id: 'task_${DateTime.now().millisecondsSinceEpoch}',
+          title: 'Revise ${updated.topic} Traps',
+          examTag: updated.examTag,
+          subject: updated.topic,
+          topics: updated.subtopic != null ? [updated.subtopic!] : ['All Topics'],
+          scheduledAt: DateTime.now().add(const Duration(days: 2)),
+          listName: 'My Tasks',
+          createdAt: DateTime.now(),
+        );
+        _tasks.insert(0, autoTask);
+        await _persistTasks();
+      }
+    }
+
     notifyListeners();
 
     await _service.setSlipSaved(updated, newState);
@@ -351,6 +389,11 @@ class SlipProvider extends ChangeNotifier {
     _service.toggleDoubtResolved(slipId, newState);
   }
 
+  void setPostTypeFilter(PostType? filter) {
+    _selectedPostTypeFilter = filter;
+    notifyListeners();
+  }
+
   // 5. Submit new slip (Doubt or Mistake, Public or Private)
   Future<bool> dropSlip({
     required String examTag,
@@ -362,6 +405,7 @@ class SlipProvider extends ChangeNotifier {
     String? title,
     bool isResolved = false,
     List<String> imageUris = const [],
+    String? voiceAudioUrl,
     int audioDurationSeconds = 0,
     bool allowComments = true,
     bool isPublic = true,
@@ -377,6 +421,7 @@ class SlipProvider extends ChangeNotifier {
       trapStatement: trapStatement,
       fixStatement: fixStatement,
       imageUris: imageUris,
+      voiceAudioUrl: voiceAudioUrl,
       audioDurationSeconds: audioDurationSeconds,
       createdAt: DateTime.now(),
       authorId: _service.currentUserId ?? 'current_user',
@@ -398,6 +443,25 @@ class SlipProvider extends ChangeNotifier {
       await _service.saveLocalUserSlips(local);
       return true;
     }
+  }
+
+  // --- Comments & Reddit-style Threaded Replies ---
+  Future<List<Map<String, dynamic>>> fetchComments(String slipId) async {
+    return await _service.fetchComments(slipId);
+  }
+
+  Future<bool> postComment({
+    required String slipId,
+    required String body,
+    String? parentId,
+  }) async {
+    final success = await _service.postComment(
+      slipId: slipId,
+      body: body,
+      parentId: parentId,
+    );
+    notifyListeners();
+    return success;
   }
 
   // 6. Update existing slip

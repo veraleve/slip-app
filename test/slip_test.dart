@@ -105,20 +105,24 @@ void main() {
   });
 
   group('MockDataService Tests', () {
-    test('Initial slips contain high-yield GATE CS blunders', () {
+    test('Initial slips are clean with zero hardcoded placeholders', () {
       final initialSlips = MockDataService.getInitialSlips();
-      expect(initialSlips.length, greaterThanOrEqualTo(4));
-
-      final topics = initialSlips.map((s) => s.topic).toList();
-      expect(topics, contains('Linear Algebra'));
-      expect(topics.any((t) => t.contains('Operating System')), isTrue);
+      expect(initialSlips.isEmpty, isTrue);
     });
   });
 
   group('SlipProvider Logic Tests', () {
-    test('Provider initializes and allows interaction toggles', () async {
+    test('Provider initializes clean and supports dropping and toggling slips', () async {
       final provider = SlipProvider();
       await provider.init();
+
+      final now = DateTime.now();
+      await provider.dropSlip(
+        topic: 'Linear Algebra',
+        subtopic: 'Eigenvalues',
+        trapStatement: 'det(A)=0 implies all eigenvalues are 0',
+        fixStatement: 'det(A)=0 implies at least one eigenvalue is 0',
+      );
 
       expect(provider.slips.isNotEmpty, isTrue);
       final firstId = provider.slips.first.id;
@@ -135,17 +139,23 @@ void main() {
       expect(fixRevealedSlip.isFixRevealed, isTrue);
     });
 
-    test('Saved peer mistakes appear in getBlundersForTask traps', () async {
+    test('Saved peer mistakes appear in getBlundersForTask traps and auto-record tasks', () async {
       final provider = SlipProvider();
       await provider.init();
 
-      // Find or create a peer slip in Linear Algebra
+      await provider.dropSlip(
+        topic: 'Linear Algebra',
+        subtopic: 'Eigenvalues',
+        trapStatement: 'Assuming det=0 means zero eigenvalues',
+        fixStatement: 'Only one eigenvalue must be 0',
+      );
+
       final peerSlip = provider.slips.firstWhere((s) => s.topic == 'Linear Algebra');
       await provider.toggleKeep(peerSlip.id);
 
       final task = TaskItem(
         id: 'task-test',
-        title: 'Linear Algebra Test',
+        title: 'Revise Linear Algebra',
         subject: 'Linear Algebra',
         topics: ['All Topics'],
         scheduledAt: DateTime.now().add(const Duration(days: 1)),

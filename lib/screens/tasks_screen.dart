@@ -7,6 +7,8 @@ import '../providers/slip_provider.dart';
 import '../services/native_device_service.dart';
 import '../theme/slip_theme.dart';
 import '../widgets/hairline_input.dart';
+import '../widgets/slip_card.dart';
+import '../widgets/task_traps_drawer.dart';
 
 class TasksScreen extends StatefulWidget {
   final SlipProvider provider;
@@ -75,7 +77,7 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
       builder: (ctx) => AlertDialog(
         backgroundColor: SlipTheme.canvas,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(20),
           side: const BorderSide(color: SlipTheme.hairline, width: 0.8),
         ),
         title: Text(
@@ -112,8 +114,8 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
               backgroundColor: SlipTheme.trapRed,
               foregroundColor: SlipTheme.canvas,
               elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
             child: const Text(
               'DELETE',
@@ -140,70 +142,121 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
     }
   }
 
-  void _showNewListDialog() {
+  void _showNewListSheet() {
     final controller = TextEditingController();
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: SlipTheme.canvas,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(6),
-          side: const BorderSide(color: SlipTheme.hairline, width: 0.8),
-        ),
-        title: const Text(
-          'Create new list',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-            color: SlipTheme.carbon,
+      backgroundColor: SlipTheme.canvas,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 16,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
           ),
-        ),
-        content: HairlineInput(
-          controller: controller,
-          placeholder: 'Enter list title',
-          maxLines: 1,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text(
-              'CANCEL',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: SlipTheme.steel,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 14),
+                  decoration: BoxDecoration(
+                    color: SlipTheme.hairline,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
               ),
-            ),
+              const Text(
+                'Create new list',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: SlipTheme.carbon,
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                style: const TextStyle(fontSize: 14, color: SlipTheme.carbon),
+                decoration: InputDecoration(
+                  hintText: 'Enter list title',
+                  hintStyle: const TextStyle(fontSize: 14, color: SlipTheme.steel),
+                  filled: true,
+                  fillColor: SlipTheme.surface,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: SlipTheme.hairline, width: 0.8),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: SlipTheme.hairline, width: 0.8),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: SlipTheme.carbon, width: 1.2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    style: TextButton.styleFrom(
+                      foregroundColor: SlipTheme.steel,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    ),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      final name = controller.text.trim();
+                      if (name.isNotEmpty) {
+                        widget.provider.addTaskList(name);
+                        Navigator.of(ctx).pop();
+                        final newIndex = 1 + widget.provider.customLists.length;
+                        setState(() => _currentTabIndex = newIndex);
+                        _pageController.animateToPage(
+                          newIndex,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: SlipTheme.carbon,
+                      foregroundColor: SlipTheme.canvas,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () {
-              final name = controller.text.trim();
-              if (name.isNotEmpty) {
-                widget.provider.addTaskList(name);
-                Navigator.of(ctx).pop();
-                // Switch to the newly created list
-                final newIndex = 1 + widget.provider.customLists.length;
-                setState(() => _currentTabIndex = newIndex);
-                _pageController.animateToPage(
-                  newIndex,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: SlipTheme.carbon,
-              foregroundColor: SlipTheme.canvas,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
-            ),
-            child: const Text(
-              'DONE',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -213,7 +266,7 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
       context: context,
       backgroundColor: SlipTheme.canvas,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -481,7 +534,7 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
 
                     // + New list action tab
                     InkWell(
-                      onTap: _showNewListDialog,
+                      onTap: _showNewListSheet,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         alignment: Alignment.center,
@@ -538,17 +591,20 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
         ),
       ),
 
-      // 3. Google Tasks Right Bottom Floating Action Button
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddTaskSheet(
-          defaultList: _currentTabIndex == 0
-              ? 'My Tasks'
-              : (_currentTabIndex == 1 ? 'My Tasks' : tabs[_currentTabIndex]),
+      // 3. Google Tasks Right Bottom Floating Action Button (Elevated above NavDock)
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 74, right: 6),
+        child: FloatingActionButton(
+          onPressed: () => _showAddTaskSheet(
+            defaultList: _currentTabIndex == 0
+                ? 'My Tasks'
+                : (_currentTabIndex == 1 ? 'My Tasks' : tabs[_currentTabIndex]),
+          ),
+          backgroundColor: SlipTheme.carbon,
+          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          child: const Icon(Icons.add_rounded, size: 28, color: SlipTheme.canvas),
         ),
-        backgroundColor: SlipTheme.carbon,
-        elevation: 3,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: const Icon(Icons.add_rounded, size: 28, color: SlipTheme.canvas),
       ),
     );
   }
@@ -609,140 +665,214 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
     }
   }
 
+  String _formatGoogleTaskDate(DateTime scheduledAt, DateTime createdAt) {
+    final now = DateTime.now();
+    final diff = now.difference(scheduledAt);
+    if (diff.isNegative) {
+      final remainingDays = scheduledAt.difference(now).inDays;
+      if (remainingDays == 0) return 'Due today';
+      if (remainingDays == 1) return 'Due tomorrow';
+      if (remainingDays < 7) return 'Due in $remainingDays days';
+      final weeks = (remainingDays / 7).round();
+      return 'Due in $weeks week${weeks > 1 ? "s" : ""}';
+    } else {
+      final pastDays = diff.inDays;
+      if (pastDays == 0) return 'Due today';
+      if (pastDays == 1) return 'Due yesterday';
+      if (pastDays < 7) return 'Due $pastDays days ago';
+      final weeks = (pastDays / 7).floor();
+      if (weeks < 52) {
+        return '$weeks weeks ago';
+      } else {
+        final years = (weeks / 52).floor();
+        return '$years year${years > 1 ? "s" : ""} ago';
+      }
+    }
+  }
+
   Widget _buildListCard({
     required String listTitle,
     required List<TaskItem> activeTasks,
     required List<TaskItem> completedTasks,
   }) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-      child: Container(
-        decoration: BoxDecoration(
-          color: SlipTheme.canvas, // Pure white inner sheet card
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // List Header inside white card: Title + Sort + 3-dots
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 10, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      listTitle,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: SlipTheme.carbon,
-                        letterSpacing: -0.4,
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 140),
+      children: [
+        // 1. Main White Card for Active Tasks
+        Container(
+          decoration: BoxDecoration(
+            color: SlipTheme.canvas, // Pure white inner sheet card
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // List Header inside white card: Title + Sort + 3-dots
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        listTitle,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: SlipTheme.carbon,
+                          letterSpacing: -0.4,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      overflow: TextOverflow.ellipsis,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.swap_vert_rounded, size: 22, color: SlipTheme.carbon),
+                      onPressed: _showSortMenu,
+                      tooltip: 'Sort',
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.more_vert_rounded, size: 20, color: SlipTheme.carbon),
+                      onPressed: () => _showListOverflowMenu(listTitle),
+                      tooltip: 'Options',
+                    ),
+                  ],
+                ),
+              ),
+
+              if (activeTasks.isEmpty && completedTasks.isEmpty)
+                _EmptyTasksState(
+                  listName: listTitle,
+                  onAddTask: () => _showAddTaskSheet(
+                    defaultList: listTitle == 'Starred' ? 'My Tasks' : listTitle,
+                  ),
+                )
+              else if (activeTasks.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+                  child: Center(
+                    child: Text(
+                      'All tasks completed!',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: SlipTheme.steel,
+                      ),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.swap_vert_rounded, size: 22, color: SlipTheme.carbon),
-                    onPressed: _showSortMenu,
-                    tooltip: 'Sort',
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.more_vert_rounded, size: 20, color: SlipTheme.carbon),
-                    onPressed: () => _showListOverflowMenu(listTitle),
-                    tooltip: 'Options',
-                  ),
-                ],
-              ),
+                )
+              else
+                Column(
+                  children: [
+                    for (int i = 0; i < activeTasks.length; i++) ...[
+                      _buildGoogleTaskRow(activeTasks[i]),
+                      if (i < activeTasks.length - 1)
+                        const Divider(
+                          height: 1,
+                          thickness: 0.5,
+                          color: Color(0xFFEEEEEE),
+                          indent: 54,
+                          endIndent: 16,
+                        ),
+                    ],
+                  ],
+                ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        ),
+
+        // 2. Separate Rounded Card for Completed Tasks (Matches Google Tasks Screenshot)
+        if (completedTasks.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: SlipTheme.canvas,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-
-            // Task List
-            Expanded(
-              child: activeTasks.isEmpty && completedTasks.isEmpty
-                  ? _EmptyTasksState(
-                      listName: listTitle,
-                      onAddTask: () => _showAddTaskSheet(defaultList: listTitle == 'Starred' ? 'My Tasks' : listTitle),
-                    )
-                  : ListView(
-                      padding: const EdgeInsets.only(bottom: 84),
+            child: Column(
+              children: [
+                InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () {
+                    setState(() {
+                      _isCompletedExpanded = !_isCompletedExpanded;
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    child: Row(
                       children: [
-                        // Active Tasks
-                        for (final task in activeTasks) ...[
-                          _buildGoogleTaskRow(task),
-                        ],
-
-                        // Completed Tasks Section (collapsible card at bottom)
-                        if (completedTasks.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          InkWell(
-                            onTap: () {
-                              setState(() {
-                                _isCompletedExpanded = !_isCompletedExpanded;
-                              });
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    'Completed (${completedTasks.length})',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: SlipTheme.carbon,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  Icon(
-                                    _isCompletedExpanded
-                                        ? Icons.keyboard_arrow_up_rounded
-                                        : Icons.keyboard_arrow_down_rounded,
-                                    size: 20,
-                                    color: SlipTheme.steel,
-                                  ),
-                                ],
-                              ),
-                            ),
+                        Text(
+                          'Completed (${completedTasks.length})',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: SlipTheme.carbon,
                           ),
-                          if (_isCompletedExpanded) ...[
-                            for (final task in completedTasks) ...[
-                              _buildGoogleTaskRow(task),
-                            ],
-                          ],
-                        ],
+                        ),
+                        const Spacer(),
+                        Icon(
+                          _isCompletedExpanded
+                              ? Icons.keyboard_arrow_up_rounded
+                              : Icons.keyboard_arrow_down_rounded,
+                          size: 22,
+                          color: SlipTheme.carbon,
+                        ),
                       ],
                     ),
+                  ),
+                ),
+                if (_isCompletedExpanded) ...[
+                  const Divider(height: 1, thickness: 0.5, color: Color(0xFFEEEEEE)),
+                  for (int i = 0; i < completedTasks.length; i++) ...[
+                    _buildGoogleTaskRow(completedTasks[i]),
+                    if (i < completedTasks.length - 1)
+                      const Divider(
+                        height: 1,
+                        thickness: 0.5,
+                        color: Color(0xFFEEEEEE),
+                        indent: 54,
+                        endIndent: 16,
+                      ),
+                  ],
+                  const SizedBox(height: 8),
+                ],
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        ],
+      ],
     );
   }
 
   Widget _buildGoogleTaskRow(TaskItem task) {
     final blunders = widget.provider.getBlundersForTask(task);
-    final isExpanded = _expandedTaskId == task.id;
     final isSelected = _selectedTaskIds.contains(task.id);
-    final hasSavedPeerTrap = blunders.any((s) => s.hasKept && s.authorId != widget.provider.currentUserId);
+    final hasSavedPeerMistake = blunders.any((s) => s.hasKept && s.authorId != widget.provider.currentUserId);
 
     final diff = task.scheduledAt.difference(DateTime.now());
     final isOverdue = !task.isCompleted && diff.isNegative;
-    final String formattedDate = DateFormat('EEE, d MMM').format(task.scheduledAt);
+    final String timeLabel = _formatGoogleTaskDate(task.scheduledAt, task.createdAt);
 
     return InkWell(
       onTap: () {
         if (_isMultiSelect) {
           _toggleSelectTask(task.id);
         } else {
-          setState(() {
-            _expandedTaskId = isExpanded ? null : task.id;
-          });
+          _showTrapsDrawer(context, task);
         }
       },
       onLongPress: () {
@@ -750,200 +880,163 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
       },
       child: Container(
         color: isSelected ? SlipTheme.carbon.withOpacity(0.06) : Colors.transparent,
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
-        child: Column(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Google Tasks Round Checkbox (or Checkbox in Multi-Select)
-                if (_isMultiSelect)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2, right: 12),
-                    child: SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: Checkbox(
-                        value: isSelected,
-                        onChanged: (_) => _toggleSelectTask(task.id),
-                        activeColor: SlipTheme.carbon,
-                        checkColor: SlipTheme.canvas,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
-                      ),
-                    ),
-                  )
-                else
-                  GestureDetector(
-                    onTap: () {
-                      widget.provider.toggleTaskCompleted(task.id);
-                    },
-                    child: Container(
-                      width: 22,
-                      height: 22,
-                      margin: const EdgeInsets.only(top: 2, right: 14),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: task.isCompleted ? SlipTheme.clearedGreen : SlipTheme.steel,
-                          width: 1.5,
-                        ),
-                        color: task.isCompleted ? SlipTheme.clearedGreen : Colors.transparent,
-                      ),
-                      child: task.isCompleted
-                          ? const Icon(
-                              Icons.check_rounded,
-                              size: 14,
-                              color: SlipTheme.canvas,
-                            )
-                          : null,
-                    ),
-                  ),
-
-                // Title + Due Date/Time + Traps Indicator
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        task.title,
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w500,
-                          color: task.isCompleted ? SlipTheme.steel : SlipTheme.carbon,
-                          decoration: task.isCompleted ? TextDecoration.lineThrough : null,
-                          height: 1.3,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-
-                      // Meta row: Date in red if due/overdue + Trap pill
-                      Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: [
-                          // Date with clock icon (brick red like screenshot)
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.access_time_rounded,
-                                size: 12,
-                                color: isOverdue ? SlipTheme.trapRed : SlipTheme.steel,
-                              ),
-                              const SizedBox(width: 3.5),
-                              Text(
-                                formattedDate,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: isOverdue ? SlipTheme.trapRed : SlipTheme.steel,
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          // Trap indicator pill
-                          if (blunders.isNotEmpty)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                              decoration: BoxDecoration(
-                                color: SlipTheme.trapRed.withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    hasSavedPeerTrap ? Icons.bookmark_added_rounded : Icons.warning_amber_rounded,
-                                    size: 11,
-                                    color: SlipTheme.trapRed,
-                                  ),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    hasSavedPeerTrap
-                                        ? '${blunders.length} TRAPS (SAVED PEER TRAP)'
-                                        : '${blunders.length} TRAPS',
-                                    style: const TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w800,
-                                      color: SlipTheme.trapRed,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
+            // Google Tasks Round Checkbox (or Circular Checkbox in Multi-Select)
+            if (_isMultiSelect)
+              Padding(
+                padding: const EdgeInsets.only(top: 2, right: 14),
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: Checkbox(
+                    value: isSelected,
+                    onChanged: (_) => _toggleSelectTask(task.id),
+                    activeColor: SlipTheme.carbon,
+                    checkColor: SlipTheme.canvas,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: const CircleBorder(),
                   ),
                 ),
-
-                // Star Button on the right
-                GestureDetector(
-                  onTap: () {
-                    widget.provider.toggleTaskStarred(task.id);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 8, top: 2),
-                    child: Icon(
-                      task.isStarred ? Icons.star_rounded : Icons.star_outline_rounded,
-                      size: 20,
-                      color: task.isStarred ? const Color(0xFFF9A825) : SlipTheme.steel,
+              )
+            else
+              GestureDetector(
+                onTap: () {
+                  widget.provider.toggleTaskCompleted(task.id);
+                },
+                child: Container(
+                  width: 22,
+                  height: 22,
+                  margin: const EdgeInsets.only(top: 2, right: 14),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: task.isCompleted ? const Color(0xFF747775) : const Color(0xFF747775),
+                      width: 1.5,
                     ),
+                    color: task.isCompleted ? const Color(0xFF747775) : Colors.transparent,
                   ),
-                ),
-              ],
-            ),
-
-            // Inoculation Trap Checklist (Expanded view)
-            if (isExpanded) ...[
-              const SizedBox(height: 10),
-              Container(
-                margin: const EdgeInsets.only(left: 36),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: SlipTheme.surface,
-                  border: Border.all(color: SlipTheme.hairline, width: 0.8),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'TOPIC INOCULATION TRAPS (${blunders.length})',
-                      style: const TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
-                        color: SlipTheme.steel,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    if (blunders.isEmpty)
-                      const Text(
-                        'No blunders logged yet for this topic. Tap "KEEP" on peer blunders or log your mistakes to attach revision traps here.',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          color: SlipTheme.steel,
-                          height: 1.35,
-                        ),
-                      )
-                    else
-                      ...blunders.map((b) => _BlunderPreviewRow(
-                            slip: b,
-                            currentUserId: widget.provider.currentUserId,
-                          )),
-                  ],
+                  child: task.isCompleted
+                      ? const Icon(
+                          Icons.check_rounded,
+                          size: 14,
+                          color: SlipTheme.canvas,
+                        )
+                      : null,
                 ),
               ),
-            ],
+
+            // Title + Due Date/Time + Mistakes Indicator
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    task.title,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w400,
+                      color: task.isCompleted ? const Color(0xFF747775) : const Color(0xFF1F1F1F),
+                      decoration: task.isCompleted ? TextDecoration.lineThrough : null,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+
+                  // Meta row: Date in red with clock icon + Warm Yellow/Amber Mistake pill badge
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      // Date with clock icon (brick red like screenshot)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.access_time_rounded,
+                            size: 12,
+                            color: isOverdue ? const Color(0xFFB3261E) : SlipTheme.steel,
+                          ),
+                          const SizedBox(width: 3.5),
+                          Text(
+                            timeLabel,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              color: isOverdue ? const Color(0xFFB3261E) : SlipTheme.steel,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // Warm Yellow/Amber Mistake indicator pill
+                      if (blunders.isNotEmpty)
+                        GestureDetector(
+                          onTap: () => _showTrapsDrawer(context, task),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xFFD97706).withOpacity(0.45),
+                                width: 0.8,
+                              ),
+                              color: const Color(0xFFFEF3C7).withOpacity(0.6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.warning_amber_rounded,
+                                  size: 12.5,
+                                  color: Color(0xFFD97706),
+                                ),
+                                const SizedBox(width: 3.5),
+                                Text(
+                                  hasSavedPeerMistake
+                                      ? '${blunders.length} MISTAKES · SAVED PEER'
+                                      : '${blunders.length} MISTAKES',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFFB45309),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // Star Button on the right
+            GestureDetector(
+              onTap: () {
+                widget.provider.toggleTaskStarred(task.id);
+              },
+              child: Padding(
+                padding: const EdgeInsets.only(left: 8, top: 2),
+                child: Icon(
+                  task.isStarred ? Icons.star_rounded : Icons.star_border_rounded,
+                  size: 22,
+                  color: task.isStarred ? const Color(0xFFF9A825) : const Color(0xFF747775),
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  void _showTrapsDrawer(BuildContext context, TaskItem task) {
+    TaskTrapsDrawer.show(context, provider: widget.provider, task: task);
   }
 
   void _showAddTaskSheet({String defaultList = 'My Tasks'}) {
@@ -964,7 +1057,7 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
       isScrollControlled: true,
       backgroundColor: SlipTheme.canvas,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
         return StatefulBuilder(
@@ -1016,7 +1109,7 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
                     // Task Title
                     HairlineInput(
                       controller: titleController,
-                      placeholder: 'e.g. Do probability homework, Mock test, Formula revision',
+                      placeholder: 'e.g. Do probability homework, Formula revision',
                       maxLines: 1,
                     ),
                     const SizedBox(height: 14),
@@ -1032,10 +1125,10 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
                     ),
                     const SizedBox(height: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
                       decoration: BoxDecoration(
                         border: Border.all(color: SlipTheme.hairline, width: 0.8),
-                        borderRadius: BorderRadius.circular(2),
+                        borderRadius: BorderRadius.circular(14),
                         color: SlipTheme.surface,
                       ),
                       child: DropdownButtonHideUnderline(
@@ -1090,7 +1183,7 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
                           selectedColor: SlipTheme.carbon,
                           backgroundColor: SlipTheme.surface,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(2),
+                            borderRadius: BorderRadius.circular(14),
                             side: const BorderSide(color: SlipTheme.hairline, width: 0.8),
                           ),
                           onSelected: (_) {
@@ -1118,10 +1211,10 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
                     ),
                     const SizedBox(height: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
                       decoration: BoxDecoration(
                         border: Border.all(color: SlipTheme.hairline, width: 0.8),
-                        borderRadius: BorderRadius.circular(2),
+                        borderRadius: BorderRadius.circular(14),
                         color: SlipTheme.surface,
                       ),
                       child: DropdownButtonHideUnderline(
@@ -1164,10 +1257,10 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
                     ),
                     const SizedBox(height: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
                       decoration: BoxDecoration(
                         border: Border.all(color: SlipTheme.hairline, width: 0.8),
-                        borderRadius: BorderRadius.circular(2),
+                        borderRadius: BorderRadius.circular(14),
                         color: SlipTheme.surface,
                       ),
                       child: DropdownButtonHideUnderline(
@@ -1232,6 +1325,9 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
                             style: OutlinedButton.styleFrom(
                               foregroundColor: SlipTheme.carbon,
                               side: const BorderSide(color: SlipTheme.hairline, width: 0.8),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
                             ),
                           ),
                         ),
@@ -1255,6 +1351,9 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
                             style: OutlinedButton.styleFrom(
                               foregroundColor: SlipTheme.carbon,
                               side: const BorderSide(color: SlipTheme.hairline, width: 0.8),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
                             ),
                           ),
                         ),
@@ -1303,7 +1402,7 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
                           backgroundColor: SlipTheme.carbon,
                           foregroundColor: SlipTheme.canvas,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(2),
+                            borderRadius: BorderRadius.circular(14),
                           ),
                           elevation: 0,
                         ),
@@ -1324,80 +1423,6 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
           },
         );
       },
-    );
-  }
-}
-
-class _BlunderPreviewRow extends StatelessWidget {
-  final Slip slip;
-  final String? currentUserId;
-
-  const _BlunderPreviewRow({required this.slip, this.currentUserId});
-
-  @override
-  Widget build(BuildContext context) {
-    final isSavedPeer = slip.hasKept && slip.authorId != currentUserId;
-    final isMine = slip.authorId != null && slip.authorId == currentUserId;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: SlipTheme.canvas,
-        border: Border.all(color: SlipTheme.hairline, width: 0.6),
-        borderRadius: BorderRadius.circular(2),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                isSavedPeer ? Icons.bookmark_added_rounded : Icons.warning_amber_rounded,
-                size: 11,
-                color: SlipTheme.trapRed,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                isSavedPeer
-                    ? 'SAVED PEER TRAP · @${slip.authorUsername ?? "peer"}'
-                    : (isMine ? 'MY LOGGED TRAP' : 'PEER TRAP · @${slip.authorUsername ?? "peer"}'),
-                style: const TextStyle(
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w800,
-                  color: SlipTheme.trapRed,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                slip.subtopic ?? slip.topic,
-                style: const TextStyle(
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w700,
-                  color: SlipTheme.steel,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            slip.trapStatement,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: SlipTheme.carbon,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            'FIX: ${slip.fixStatement}',
-            style: const TextStyle(
-              fontSize: 10,
-              color: SlipTheme.steel,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -1450,7 +1475,7 @@ class _EmptyTasksState extends StatelessWidget {
                 foregroundColor: SlipTheme.canvas,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
               child: const Text(
                 'ADD A TASK',

@@ -52,4 +52,47 @@ class NativeDeviceService {
       return null;
     }
   }
+
+  // --- NATIVE AUDIO RECORDING & PLAYBACK ---
+  static Future<bool> startAudioRecording() async {
+    try {
+      final res = await _channel.invokeMethod<bool>('startAudioRecording');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<String?> stopAudioRecording() async {
+    try {
+      final res = await _channel.invokeMethod<String>('stopAudioRecording');
+      return res;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<bool> playAudio(String filePath) async {
+    try {
+      final res = await _channel.invokeMethod<bool>('playAudio', {'path': filePath});
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<void> stopAudio() async {
+    try {
+      await _channel.invokeMethod<void>('stopAudio');
+    } catch (_) {}
+  }
+
+  static Future<bool> isAudioPlaying() async {
+    try {
+      final res = await _channel.invokeMethod<bool>('isAudioPlaying');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
 }

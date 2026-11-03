@@ -14,94 +14,93 @@ class NavDock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: SlipTheme.carbon,
-        borderRadius: BorderRadius.circular(4),
-        boxShadow: [
-          BoxShadow(
-            color: SlipTheme.carbon.withOpacity(0.18),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
+      decoration: const BoxDecoration(
+        color: SlipTheme.canvas,
+        border: Border(
+          top: BorderSide(color: Color(0xFFEEEEEE), width: 0.8),
+        ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.max,
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _DockItem(
-            label: 'STREAM',
-            icon: Icons.dynamic_feed_rounded,
-            isActive: activeIndex == 0,
-            onTap: () => onTabSelected(0),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 52,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _InstagramNavItem(
+                icon: Icons.dynamic_feed_outlined,
+                activeIcon: Icons.dynamic_feed_rounded,
+                label: 'Feed',
+                isActive: activeIndex == 0,
+                onTap: () => onTabSelected(0),
+              ),
+              _InstagramNavItem(
+                icon: Icons.add_box_outlined,
+                activeIcon: Icons.add_box_rounded,
+                label: 'Drop',
+                isActive: activeIndex == 1,
+                onTap: () => onTabSelected(1),
+              ),
+              _InstagramNavItem(
+                icon: Icons.task_alt_outlined,
+                activeIcon: Icons.task_alt_rounded,
+                label: 'Tasks',
+                isActive: activeIndex == 2,
+                onTap: () => onTabSelected(2),
+              ),
+              _InstagramNavItem(
+                icon: Icons.person_outline_rounded,
+                activeIcon: Icons.person_rounded,
+                label: 'Profile',
+                isActive: activeIndex == 3,
+                onTap: () => onTabSelected(3),
+              ),
+            ],
           ),
-          _DockItem(
-            label: 'DROP',
-            icon: Icons.add_circle_outline_rounded,
-            isActive: activeIndex == 1,
-            onTap: () => onTabSelected(1),
-          ),
-          _DockItem(
-            label: 'TASKS',
-            icon: Icons.task_alt_rounded,
-            isActive: activeIndex == 2,
-            onTap: () => onTabSelected(2),
-          ),
-          _DockItem(
-            label: 'PROFILE',
-            icon: Icons.person_outline_rounded,
-            isActive: activeIndex == 3,
-            onTap: () => onTabSelected(3),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _DockItem extends StatelessWidget {
-  final String label;
+class _InstagramNavItem extends StatelessWidget {
   final IconData icon;
+  final IconData activeIcon;
+  final String label;
   final bool isActive;
   final VoidCallback onTap;
 
-  const _DockItem({
-    required this.label,
+  const _InstagramNavItem({
     required this.icon,
+    required this.activeIcon,
+    required this.label,
     required this.isActive,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isActive ? SlipTheme.surface : Colors.transparent,
-          borderRadius: BorderRadius.circular(2),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              icon,
-              size: 16,
-              color: isActive ? SlipTheme.carbon : SlipTheme.steelLight,
+              isActive ? activeIcon : icon,
+              size: 24,
+              color: isActive ? SlipTheme.carbon : SlipTheme.steel,
             ),
-            const SizedBox(width: 5),
+            const SizedBox(height: 2),
             Text(
               label,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: isActive ? SlipTheme.carbon : SlipTheme.steelLight,
-                    letterSpacing: 0.8,
-                    fontSize: 10,
-                  ),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                color: isActive ? SlipTheme.carbon : SlipTheme.steel,
+              ),
             ),
           ],
         ),
