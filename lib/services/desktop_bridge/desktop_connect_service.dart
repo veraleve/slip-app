@@ -164,7 +164,7 @@ class DesktopConnectService {
           examTag: exam,
           topic: topic,
           subtopic: subtopic,
-          attachedImages: attachedImages,
+          imageUris: attachedImages,
           postType: isDoubt ? PostType.doubt : PostType.mistake,
           isPublic: true,
           allowComments: true,

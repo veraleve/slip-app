@@ -1805,7 +1805,7 @@ class _LocalServerSettingsPageState extends State<_LocalServerSettingsPage> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: SlipTheme.cardBg,
+              color: SlipTheme.surface,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color: isRunning ? const Color(0xFF10B981).withOpacity(0.4) : SlipTheme.hairline,
@@ -1968,7 +1968,7 @@ class _LocalServerSettingsPageState extends State<_LocalServerSettingsPage> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: SlipTheme.cardBg,
+        color: SlipTheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: SlipTheme.hairline),
       ),
