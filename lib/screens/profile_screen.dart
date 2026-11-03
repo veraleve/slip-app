@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../constants/gate_syllabus.dart';
@@ -32,7 +33,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  bool _isSharedGridView = true; // Instagram 3-col grid vs full card feed
+  bool _isSharedGridView = false; // Reddit-style full card text feed by default (toggleable to grid)
 
   Map<String, bool> _permissions = {
     'camera': false,
@@ -177,44 +178,33 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      ChoiceChip(
-                        label: const Text('All Subjects', style: TextStyle(fontSize: 10.5)),
-                        selected: tempSubject == null,
-                        selectedColor: SlipTheme.carbon,
-                        backgroundColor: SlipTheme.surface,
-                        labelStyle: TextStyle(
-                          color: tempSubject == null ? SlipTheme.canvas : SlipTheme.carbon,
-                          fontWeight: tempSubject == null ? FontWeight.w700 : FontWeight.w500,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          side: const BorderSide(color: SlipTheme.hairline, width: 0.8),
-                        ),
-                        onSelected: (_) => setSheetState(() => tempSubject = null),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: SlipTheme.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: SlipTheme.hairline, width: 0.8),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String?>(
+                        value: tempSubject,
+                        isExpanded: true,
+                        hint: const Text('All Subjects', style: TextStyle(fontSize: 12.5, color: SlipTheme.carbon)),
+                        items: [
+                          const DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text('All Subjects (No Filter)', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+                          ),
+                          ...allSubjects.map((s) => DropdownMenuItem<String?>(
+                            value: s,
+                            child: Text(s, style: const TextStyle(fontSize: 12.5)),
+                          )),
+                        ],
+                        onChanged: (val) {
+                          setSheetState(() => tempSubject = val);
+                        },
                       ),
-                      ...allSubjects.map((s) {
-                        final isSel = tempSubject == s;
-                        return ChoiceChip(
-                          label: Text(s, style: const TextStyle(fontSize: 10.5)),
-                          selected: isSel,
-                          selectedColor: SlipTheme.carbon,
-                          backgroundColor: SlipTheme.surface,
-                          labelStyle: TextStyle(
-                            color: isSel ? SlipTheme.canvas : SlipTheme.carbon,
-                            fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            side: const BorderSide(color: SlipTheme.hairline, width: 0.8),
-                          ),
-                          onSelected: (_) => setSheetState(() => tempSubject = isSel ? null : s),
-                        );
-                      }),
-                    ],
+                    ),
                   ),
                   const SizedBox(height: 20),
                   Row(
@@ -288,13 +278,16 @@ class _ProfileScreenState extends State<ProfileScreen>
     final fixController = TextEditingController(text: slip.fixStatement);
     final List<String> currentImages = List.from(slip.imageUris);
     int currentAudioSec = slip.audioDurationSeconds;
+    String? currentAudioPath = slip.voiceAudioUrl;
+    bool isRecordingVoice = false;
+    Timer? voiceTimer;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: SlipTheme.canvas,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
         return StatefulBuilder(
@@ -325,7 +318,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                           icon: const Icon(Icons.close_rounded, size: 20),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
-                          onPressed: () => Navigator.of(ctx).pop(),
+                          onPressed: () {
+                            voiceTimer?.cancel();
+                            Navigator.of(ctx).pop();
+                          },
                         ),
                       ],
                     ),
@@ -401,7 +397,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             return Stack(
                               children: [
                                 ClipRRect(
-                                  borderRadius: BorderRadius.circular(2),
+                                  borderRadius: BorderRadius.circular(10),
                                   child: Image.file(
                                     File(currentImages[i]),
                                     width: 60,
@@ -435,22 +431,86 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ],
                     const SizedBox(height: 14),
 
-                    // Voice Note Indicator
+                    // Voice Note Recording / Management Section
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          currentAudioSec > 0
-                              ? 'VOICE NOTE (${currentAudioSec}s)'
-                              : 'NO VOICE NOTE',
-                          style: const TextStyle(fontSize: 10, color: SlipTheme.steel, fontWeight: FontWeight.w700),
+                          isRecordingVoice
+                              ? 'RECORDING... (${currentAudioSec}s)'
+                              : (currentAudioSec > 0
+                                  ? 'VOICE NOTE (${currentAudioSec}s)'
+                                  : 'NO VOICE NOTE'),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: isRecordingVoice ? SlipTheme.trapRed : SlipTheme.steel,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                        if (currentAudioSec > 0)
-                          TextButton(
-                            onPressed: () {
-                              setModalState(() => currentAudioSec = 0);
+                        if (isRecordingVoice)
+                          ElevatedButton(
+                            onPressed: () async {
+                              voiceTimer?.cancel();
+                              final path = await NativeDeviceService.stopAudioRecording();
+                              setModalState(() {
+                                isRecordingVoice = false;
+                                currentAudioPath = path;
+                              });
                             },
-                            child: const Text('REMOVE AUDIO', style: TextStyle(fontSize: 9.5, color: SlipTheme.trapRed)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: SlipTheme.trapRed,
+                              foregroundColor: Colors.white,
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: const Text('STOP', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800)),
+                          )
+                        else if (currentAudioSec > 0)
+                          Row(
+                            children: [
+                              TextButton(
+                                onPressed: () {
+                                  if (currentAudioPath != null && currentAudioPath!.isNotEmpty) {
+                                    NativeDeviceService.playAudio(currentAudioPath!);
+                                  }
+                                },
+                                style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                                child: const Text('PLAY', style: TextStyle(fontSize: 10, color: SlipTheme.carbon, fontWeight: FontWeight.w700)),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  NativeDeviceService.stopAudio();
+                                  setModalState(() {
+                                    currentAudioSec = 0;
+                                    currentAudioPath = null;
+                                  });
+                                },
+                                style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                                child: const Text('REMOVE', style: TextStyle(fontSize: 10, color: SlipTheme.trapRed, fontWeight: FontWeight.w700)),
+                              ),
+                            ],
+                          )
+                        else
+                          TextButton.icon(
+                            onPressed: () async {
+                              final started = await NativeDeviceService.startAudioRecording();
+                              if (started) {
+                                setModalState(() {
+                                  isRecordingVoice = true;
+                                  currentAudioSec = 0;
+                                });
+                                voiceTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+                                  setModalState(() => currentAudioSec++);
+                                });
+                              }
+                            },
+                            icon: const Icon(Icons.mic_none_rounded, size: 14),
+                            label: const Text('ADD VOICE NOTE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
+                            style: TextButton.styleFrom(
+                              foregroundColor: SlipTheme.carbon,
+                              visualDensity: VisualDensity.compact,
+                            ),
                           ),
                       ],
                     ),
@@ -459,14 +519,16 @@ class _ProfileScreenState extends State<ProfileScreen>
                     // Save Button
                     SizedBox(
                       width: double.infinity,
-                      height: 44,
+                      height: 46,
                       child: ElevatedButton(
                         onPressed: () async {
+                          voiceTimer?.cancel();
                           final updated = slip.copyWith(
                             trapStatement: trapController.text.trim(),
                             fixStatement: fixController.text.trim(),
                             imageUris: currentImages,
                             audioDurationSeconds: currentAudioSec,
+                            voiceAudioUrl: currentAudioPath,
                           );
                           await widget.provider.updateSlip(updated);
                           Navigator.of(ctx).pop();
@@ -476,7 +538,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           backgroundColor: SlipTheme.carbon,
                           foregroundColor: SlipTheme.canvas,
                           elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
                         child: const Text('SAVE CHANGES', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
                       ),
@@ -1030,7 +1092,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
             color: SlipTheme.surface,
-            borderRadius: BorderRadius.circular(3),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: SlipTheme.hairline, width: 0.8),
           ),
           child: Column(
@@ -1038,14 +1100,14 @@ class _ProfileScreenState extends State<ProfileScreen>
             children: [
               // Top Action Bar with Subject, Edit & Delete Icons
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+                padding: const EdgeInsets.fromLTRB(14, 10, 12, 6),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       slip.topic,
                       style: const TextStyle(
-                        fontSize: 10.5,
+                        fontSize: 11,
                         fontWeight: FontWeight.w800,
                         color: SlipTheme.carbon,
                       ),
@@ -1074,10 +1136,11 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
               const Divider(color: SlipTheme.hairline, height: 1),
 
-              // Embedded Slip Card Content
+              // Embedded Slip Card Content (Reddit-style full text with provider)
               SlipCard(
                 index: index,
                 slip: slip,
+                provider: widget.provider,
                 onSameTap: () => widget.provider.toggleSame(slip.id),
                 onFixToggle: () => widget.provider.toggleFixRevealed(slip.id),
                 onKeepTap: () => widget.provider.toggleKeep(slip.id),
@@ -1098,7 +1161,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       isScrollControlled: true,
       backgroundColor: SlipTheme.canvas,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
         return SafeArea(
@@ -1139,6 +1202,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   SlipCard(
                     index: 0,
                     slip: slip,
+                    provider: widget.provider,
                     onSameTap: () => widget.provider.toggleSame(slip.id),
                     onFixToggle: () => widget.provider.toggleFixRevealed(slip.id),
                     onKeepTap: () => widget.provider.toggleKeep(slip.id),
@@ -1186,6 +1250,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         return SlipCard(
           index: index,
           slip: slip,
+          provider: widget.provider,
           onSameTap: () => widget.provider.toggleSame(slip.id),
           onFixToggle: () => widget.provider.toggleFixRevealed(slip.id),
           onKeepTap: () => widget.provider.toggleKeep(slip.id),
@@ -1228,6 +1293,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         return SlipCard(
           index: index,
           slip: slip,
+          provider: widget.provider,
           onSameTap: () => widget.provider.toggleSame(slip.id),
           onFixToggle: () => widget.provider.toggleFixRevealed(slip.id),
           onKeepTap: () => widget.provider.toggleKeep(slip.id),

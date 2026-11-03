@@ -440,7 +440,7 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
     final tabs = <String>['Starred', 'My Tasks', ...customLists];
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F3F5), // Google Tasks light grey background
+      backgroundColor: SlipTheme.canvas,
       body: SafeArea(
         child: Column(
           children: [
@@ -485,7 +485,7 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
               )
             else
               Container(
-                color: const Color(0xFFF2F3F5),
+                color: SlipTheme.canvas,
                 height: 46,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
@@ -591,9 +591,9 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
         ),
       ),
 
-      // 3. Google Tasks Right Bottom Floating Action Button (Elevated above NavDock)
+      // 3. Google Tasks Right Bottom Floating Action Button (Positioned just above NavDock)
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 74, right: 6),
+        padding: const EdgeInsets.only(bottom: 16, right: 10),
         child: FloatingActionButton(
           onPressed: () => _showAddTaskSheet(
             defaultList: _currentTabIndex == 0
@@ -696,163 +696,125 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
     required List<TaskItem> completedTasks,
   }) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 140),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
       children: [
-        // 1. Main White Card for Active Tasks
-        Container(
-          decoration: BoxDecoration(
-            color: SlipTheme.canvas, // Pure white inner sheet card
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        // List Header: Title + Sort + 3-dots (Rendered directly on screen)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 10, 0, 8),
+          child: Row(
             children: [
-              // List Header inside white card: Title + Sort + 3-dots
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        listTitle,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: SlipTheme.carbon,
-                          letterSpacing: -0.4,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.swap_vert_rounded, size: 22, color: SlipTheme.carbon),
-                      onPressed: _showSortMenu,
-                      tooltip: 'Sort',
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.more_vert_rounded, size: 20, color: SlipTheme.carbon),
-                      onPressed: () => _showListOverflowMenu(listTitle),
-                      tooltip: 'Options',
-                    ),
-                  ],
+              Expanded(
+                child: Text(
+                  listTitle,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: SlipTheme.carbon,
+                    letterSpacing: -0.4,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-
-              if (activeTasks.isEmpty && completedTasks.isEmpty)
-                _EmptyTasksState(
-                  listName: listTitle,
-                  onAddTask: () => _showAddTaskSheet(
-                    defaultList: listTitle == 'Starred' ? 'My Tasks' : listTitle,
-                  ),
-                )
-              else if (activeTasks.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 28),
-                  child: Center(
-                    child: Text(
-                      'All tasks completed!',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: SlipTheme.steel,
-                      ),
-                    ),
-                  ),
-                )
-              else
-                Column(
-                  children: [
-                    for (int i = 0; i < activeTasks.length; i++) ...[
-                      _buildGoogleTaskRow(activeTasks[i]),
-                      if (i < activeTasks.length - 1)
-                        const Divider(
-                          height: 1,
-                          thickness: 0.5,
-                          color: Color(0xFFEEEEEE),
-                          indent: 54,
-                          endIndent: 16,
-                        ),
-                    ],
-                  ],
-                ),
-              const SizedBox(height: 10),
+              IconButton(
+                icon: const Icon(Icons.swap_vert_rounded, size: 22, color: SlipTheme.carbon),
+                onPressed: _showSortMenu,
+                tooltip: 'Sort',
+              ),
+              IconButton(
+                icon: const Icon(Icons.more_vert_rounded, size: 20, color: SlipTheme.carbon),
+                onPressed: () => _showListOverflowMenu(listTitle),
+                tooltip: 'Options',
+              ),
             ],
           ),
         ),
 
-        // 2. Separate Rounded Card for Completed Tasks (Matches Google Tasks Screenshot)
-        if (completedTasks.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Container(
-            decoration: BoxDecoration(
-              color: SlipTheme.canvas,
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+        if (activeTasks.isEmpty && completedTasks.isEmpty)
+          _EmptyTasksState(
+            listName: listTitle,
+            onAddTask: () => _showAddTaskSheet(
+              defaultList: listTitle == 'Starred' ? 'My Tasks' : listTitle,
             ),
-            child: Column(
-              children: [
-                InkWell(
-                  borderRadius: BorderRadius.circular(18),
-                  onTap: () {
-                    setState(() {
-                      _isCompletedExpanded = !_isCompletedExpanded;
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                    child: Row(
-                      children: [
-                        Text(
-                          'Completed (${completedTasks.length})',
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: SlipTheme.carbon,
-                          ),
-                        ),
-                        const Spacer(),
-                        Icon(
-                          _isCompletedExpanded
-                              ? Icons.keyboard_arrow_up_rounded
-                              : Icons.keyboard_arrow_down_rounded,
-                          size: 22,
-                          color: SlipTheme.carbon,
-                        ),
-                      ],
+          )
+        else if (activeTasks.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            child: Center(
+              child: Text(
+                'All tasks completed!',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: SlipTheme.steel,
+                ),
+              ),
+            ),
+          )
+        else
+          Column(
+            children: [
+              for (int i = 0; i < activeTasks.length; i++) ...[
+                _buildGoogleTaskRow(activeTasks[i]),
+                if (i < activeTasks.length - 1)
+                  const Divider(
+                    height: 1,
+                    thickness: 0.5,
+                    color: Color(0xFFF0F0F0),
+                    indent: 48,
+                    endIndent: 8,
+                  ),
+              ],
+            ],
+          ),
+
+        // Completed Tasks Section (Rendered directly on canvas)
+        if (completedTasks.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          const Divider(height: 1, thickness: 0.8, color: Color(0xFFEEEEEE)),
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () {
+              setState(() {
+                _isCompletedExpanded = !_isCompletedExpanded;
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
+              child: Row(
+                children: [
+                  Text(
+                    'Completed (${completedTasks.length})',
+                    style: const TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: SlipTheme.carbon,
                     ),
                   ),
-                ),
-                if (_isCompletedExpanded) ...[
-                  const Divider(height: 1, thickness: 0.5, color: Color(0xFFEEEEEE)),
-                  for (int i = 0; i < completedTasks.length; i++) ...[
-                    _buildGoogleTaskRow(completedTasks[i]),
-                    if (i < completedTasks.length - 1)
-                      const Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        color: Color(0xFFEEEEEE),
-                        indent: 54,
-                        endIndent: 16,
-                      ),
-                  ],
-                  const SizedBox(height: 8),
+                  const Spacer(),
+                  Icon(
+                    _isCompletedExpanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    size: 22,
+                    color: SlipTheme.carbon,
+                  ),
                 ],
-              ],
+              ),
             ),
           ),
+          if (_isCompletedExpanded) ...[
+            for (int i = 0; i < completedTasks.length; i++) ...[
+              _buildGoogleTaskRow(completedTasks[i]),
+              if (i < completedTasks.length - 1)
+                const Divider(
+                  height: 1,
+                  thickness: 0.5,
+                  color: Color(0xFFF0F0F0),
+                  indent: 48,
+                  endIndent: 8,
+                ),
+            ],
+          ],
         ],
       ],
     );

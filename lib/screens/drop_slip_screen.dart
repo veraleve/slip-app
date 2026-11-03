@@ -163,7 +163,7 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
       builder: (ctx) {
         return AlertDialog(
           backgroundColor: SlipTheme.canvas,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           contentPadding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -369,10 +369,10 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
 
               // 0. Dual Mode Toggle: [ ASK A DOUBT ] | [ LOG A MISTAKE ]
               Container(
-                padding: const EdgeInsets.all(2.5),
+                padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: SlipTheme.surface,
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: SlipTheme.hairline, width: 0.8),
                 ),
                 child: Row(
@@ -386,10 +386,10 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                           });
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
                             color: isDoubt ? SlipTheme.carbon : Colors.transparent,
-                            borderRadius: BorderRadius.circular(2.5),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                           child: Center(
                             child: Row(
@@ -425,10 +425,10 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                           });
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
                             color: !isDoubt ? SlipTheme.carbon : Colors.transparent,
-                            borderRadius: BorderRadius.circular(2.5),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                           child: Center(
                             child: Row(
@@ -490,7 +490,7 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                     selectedColor: SlipTheme.carbon,
                     backgroundColor: SlipTheme.surface,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(16),
                       side: const BorderSide(color: SlipTheme.hairline, width: 0.8),
                     ),
                     onSelected: (_) => _onExamChanged(exam),
@@ -511,10 +511,10 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
               ),
               const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
                 decoration: BoxDecoration(
                   border: Border.all(color: SlipTheme.hairline, width: 0.8),
-                  borderRadius: BorderRadius.circular(3),
+                  borderRadius: BorderRadius.circular(16),
                   color: SlipTheme.surface,
                 ),
                 child: DropdownButtonHideUnderline(
@@ -552,10 +552,10 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
               ),
               const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
                 decoration: BoxDecoration(
                   border: Border.all(color: SlipTheme.hairline, width: 0.8),
-                  borderRadius: BorderRadius.circular(3),
+                  borderRadius: BorderRadius.circular(16),
                   color: SlipTheme.surface,
                 ),
                 child: DropdownButtonHideUnderline(
@@ -702,12 +702,12 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                   // Camera Icon Action Button
                   InkWell(
                     onTap: _capturePhoto,
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(16),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                       decoration: BoxDecoration(
                         color: SlipTheme.surface,
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: SlipTheme.hairline, width: 0.8),
                       ),
                       child: Row(
@@ -748,14 +748,14 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                         _startVoiceRecording();
                       }
                     },
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(16),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                       decoration: BoxDecoration(
                         color: _isRecordingVoice
                             ? SlipTheme.trapRed.withOpacity(0.08)
                             : (_hasVoiceNote ? SlipTheme.clearedGreen.withOpacity(0.08) : SlipTheme.surface),
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: _isRecordingVoice
                               ? SlipTheme.trapRed
@@ -847,7 +847,7 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                       return Stack(
                         children: [
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(3),
+                            borderRadius: BorderRadius.circular(12),
                             child: Image.file(
                               File(path),
                               width: 72,
@@ -911,7 +911,7 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                               color: !_isPublic ? SlipTheme.carbon : SlipTheme.hairline,
                               width: 0.8,
                             ),
-                            borderRadius: BorderRadius.circular(3),
+                            borderRadius: BorderRadius.circular(14),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -947,7 +947,7 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                               color: _isPublic ? SlipTheme.carbon : SlipTheme.hairline,
                               width: 0.8,
                             ),
-                            borderRadius: BorderRadius.circular(3),
+                            borderRadius: BorderRadius.circular(14),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -976,10 +976,10 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                 if (!_isPublic) ...[
                   const SizedBox(height: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: SlipTheme.surface,
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: SlipTheme.hairline, width: 0.6),
                     ),
                     child: const Row(
@@ -1002,11 +1002,11 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
 
               // 7. Peer Comments Toggle Button
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
                   color: SlipTheme.surface,
                   border: Border.all(color: SlipTheme.hairline, width: 0.8),
-                  borderRadius: BorderRadius.circular(3),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1058,14 +1058,14 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
               // Submit Button
               SizedBox(
                 width: double.infinity,
-                height: 46,
+                height: 48,
                 child: ElevatedButton(
                   onPressed: _isSubmitting ? null : _submitSlip,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: SlipTheme.carbon,
                     foregroundColor: SlipTheme.canvas,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(3),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     elevation: 0,
                   ),

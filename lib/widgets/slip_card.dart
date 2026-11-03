@@ -35,8 +35,6 @@ class SlipCard extends StatefulWidget {
 }
 
 class _SlipCardState extends State<SlipCard> {
-  bool _showComments = false;
-
   String _formatInstagramTime(DateTime dt) {
     final diff = DateTime.now().difference(dt);
     if (diff.inSeconds < 60) {
@@ -61,15 +59,19 @@ class _SlipCardState extends State<SlipCard> {
     final isDoubt = slip.postType == PostType.doubt;
     final examShort = slip.examTag.replaceAll('GATE ', '').replaceAll(RegExp(r'\s*\d{4}'), '');
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: SlipTheme.hairline, width: 0.8),
+    return InkWell(
+      onTap: () => _openPostDetail(context),
+      splashColor: Colors.transparent,
+      highlightColor: Colors.black.withOpacity(0.015),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: const BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: SlipTheme.hairline, width: 0.8),
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 1. Author Handle, Timestamp, Post Type Badges & Exam Tag
           Row(
@@ -346,50 +348,29 @@ class _SlipCardState extends State<SlipCard> {
             const SizedBox(height: 10),
           ],
 
-          // 6. Action Row
+          // 6. Action Row: Design Principle (Reactions, Comment, Cleared on Left; Save on Right)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Reveal / Hide Fix text button
-              if (slip.fixStatement.isNotEmpty)
-                InkWell(
-                  onTap: widget.onFixToggle,
-                  borderRadius: BorderRadius.circular(2),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-                    child: Text(
-                      slip.isFixRevealed
-                          ? (isDoubt ? 'Hide solution' : 'Hide fix')
-                          : (isDoubt ? 'Reveal solution' : 'Reveal fix'),
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: SlipTheme.carbon,
-                            fontWeight: FontWeight.w600,
-                            decoration: TextDecoration.underline,
-                          ),
-                    ),
-                  ),
-                )
-              else
-                const SizedBox.shrink(),
-
-              // Instagram-style clean icons row
+              // LEFT: Question-mark / Warning Reaction, Comment, and Cleared Checkmark
               Row(
                 children: [
-                  // Same Reaction ("I have this doubt / fell for this too")
+                  // Reaction ("I have this doubt / fell for this too")
                   InkWell(
                     onTap: widget.onSameTap,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(14),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
                             isDoubt
                                 ? (slip.hasSaidSame ? Icons.help_rounded : Icons.help_outline_rounded)
                                 : (slip.hasSaidSame ? Icons.warning_rounded : Icons.warning_amber_rounded),
-                            size: 17,
+                            size: 18,
                             color: slip.hasSaidSame
-                                ? SlipTheme.trapRed
+                                ? (isDoubt ? SlipTheme.carbon : SlipTheme.trapRed)
                                 : SlipTheme.steel,
                           ),
                           if (slip.sameCount > 0) ...[
@@ -397,10 +378,10 @@ class _SlipCardState extends State<SlipCard> {
                             Text(
                               '${slip.sameCount}',
                               style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
                                 color: slip.hasSaidSame
-                                    ? SlipTheme.trapRed
+                                    ? (isDoubt ? SlipTheme.carbon : SlipTheme.trapRed)
                                     : SlipTheme.steel,
                               ),
                             ),
@@ -409,36 +390,50 @@ class _SlipCardState extends State<SlipCard> {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 6),
 
-                  // Save / Bookmark (Adds to My Review Cycle)
+                  // Comment / Answer Icon (Opens PostDetailScreen)
                   InkWell(
-                    onTap: widget.onKeepTap,
-                    borderRadius: BorderRadius.circular(2),
+                    onTap: () => _openPostDetail(context),
+                    borderRadius: BorderRadius.circular(14),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                      child: Icon(
-                        slip.hasKept
-                            ? Icons.bookmark_rounded
-                            : Icons.bookmark_border_rounded,
-                        size: 17,
-                        color: slip.hasKept
-                            ? SlipTheme.carbon
-                            : SlipTheme.steel,
+                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.chat_bubble_outline_rounded,
+                            size: 17,
+                            color: SlipTheme.steel,
+                          ),
+                          if (slip.commentsCount > 0) ...[
+                            const SizedBox(width: 4),
+                            Text(
+                              '${slip.commentsCount}',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: SlipTheme.steel,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ),
+                  const SizedBox(width: 6),
 
-                  // Solve / Mastered / Resolved Checkmark Icon
+                  // Solved / Cleared / Mastered Checkmark Icon
                   InkWell(
                     onTap: widget.onSolveTap,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(14),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
                       child: Icon(
                         (isDoubt ? slip.isResolved : slip.hasCleared)
                             ? Icons.check_circle_rounded
                             : Icons.check_circle_outline_rounded,
-                        size: 17,
+                        size: 18,
                         color: (isDoubt ? slip.isResolved : slip.hasCleared)
                             ? SlipTheme.clearedGreen
                             : SlipTheme.steel,
@@ -446,62 +441,66 @@ class _SlipCardState extends State<SlipCard> {
                     ),
                   ),
 
-                  // Comment / Answer Toggle (Chat Bubble)
-                  InkWell(
-                    onTap: () {
-                      if (!slip.allowComments) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              isDoubt
-                                  ? 'Answers are turned off by author for this doubt.'
-                                  : 'Comments are turned off by author for this blunder.',
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                        return;
-                      }
-                      setState(() {
-                        _showComments = !_showComments;
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(2),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                      child: Icon(
-                        _showComments
-                            ? Icons.chat_bubble_rounded
-                            : Icons.chat_bubble_outline_rounded,
-                        size: 16,
-                        color: _showComments
-                            ? SlipTheme.carbon
-                            : (slip.allowComments ? SlipTheme.steel : SlipTheme.hairline),
+                  // Optional Reveal / Hide Solution toggle inline
+                  if (slip.fixStatement.isNotEmpty) ...[
+                    const SizedBox(width: 4),
+                    InkWell(
+                      onTap: widget.onFixToggle,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                        child: Text(
+                          slip.isFixRevealed
+                              ? (isDoubt ? 'Hide answer' : 'Hide fix')
+                              : (isDoubt ? 'Answer' : 'Fix'),
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: SlipTheme.carbon,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 10,
+                                decoration: TextDecoration.underline,
+                              ),
+                        ),
                       ),
                     ),
-                  ),
-
-                  // Bluetooth Share / Beam
-                  InkWell(
-                    onTap: widget.onPassTap,
-                    borderRadius: BorderRadius.circular(2),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 4, horizontal: 6),
-                      child: Icon(
-                        Icons.bluetooth_audio_rounded,
-                        size: 17,
-                        color: SlipTheme.steel,
-                      ),
-                    ),
-                  ),
+                  ],
                 ],
+              ),
+
+              // RIGHT: Bookmark / Save to Revision
+              InkWell(
+                onTap: widget.onKeepTap,
+                borderRadius: BorderRadius.circular(14),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                  child: Icon(
+                    slip.hasKept
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_border_rounded,
+                    size: 19,
+                    color: slip.hasKept
+                        ? SlipTheme.carbon
+                        : SlipTheme.steel,
+                  ),
+                ),
               ),
             ],
           ),
         ],
       ),
     );
+  }
+
+  void _openPostDetail(BuildContext context) {
+    if (widget.provider != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => PostDetailScreen(
+            slip: widget.slip,
+            provider: widget.provider!,
+          ),
+        ),
+      );
+    }
   }
 
   void _openFullProfile(BuildContext context, String handle, String examTag) {

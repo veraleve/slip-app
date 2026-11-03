@@ -62,10 +62,8 @@ class SupabaseService {
 
   SupabaseClient? get client => _client;
   bool get isAuthenticated =>
-      (_isLoggedIn && _rememberDevice) ||
-      (_currentUsername != null &&
-          _currentUsername!.isNotEmpty &&
-          !_currentUsername!.startsWith('peer_'));
+      _isLoggedIn ||
+      (_rememberDevice && _currentUsername != null && _currentUsername!.isNotEmpty);
   bool get isLoggedIn => _isLoggedIn;
   bool get rememberDevice => _rememberDevice;
   String? get savedUsername => _savedUsername ?? _currentUsername;
@@ -87,7 +85,9 @@ class SupabaseService {
     await prefs.setBool('slip_is_logged_in', value);
     await prefs.setBool('slip_remember_device', rememberDevice);
     if (username != null) {
+      _currentUsername = username;
       _savedUsername = username;
+      await prefs.setString('slip_username', username);
       await prefs.setString('slip_saved_username', username);
     }
     if (rememberDevice && password != null) {
@@ -247,18 +247,24 @@ class SupabaseService {
     _currentUsername = username;
     _currentUserId = userId;
     _targetExams = List.from(exams);
+    _isLoggedIn = true;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('slip_username', username);
     await prefs.setString('slip_user_id', userId);
     await prefs.setStringList('slip_target_exams', _targetExams);
+    await prefs.setBool('slip_is_logged_in', true);
   }
 
   Future<void> signOut() async {
     _currentUsername = null;
     _currentUserId = null;
+    _isLoggedIn = false;
+    _savedPassword = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('slip_username');
     await prefs.remove('slip_user_id');
+    await prefs.setBool('slip_is_logged_in', false);
+    await prefs.remove('slip_saved_password');
 
     if (_client != null) {
       try {

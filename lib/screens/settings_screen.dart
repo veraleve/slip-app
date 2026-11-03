@@ -87,7 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: SlipTheme.canvas,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'SIGN OUT',
           style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, letterSpacing: 0.5),
@@ -106,11 +106,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Navigator.of(ctx).pop();
               await SupabaseService().signOut();
               widget.onSignOut();
+              if (mounted) {
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: SlipTheme.trapRed,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: const Text('CONFIRM SIGN OUT'),
           ),

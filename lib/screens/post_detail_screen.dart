@@ -487,16 +487,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     alignment: Alignment.center,
                     child: const Column(
                       children: [
-                        Icon(Icons.forum_outlined, size: 36, color: SlipTheme.steelLight),
-                        SizedBox(height: 8),
-                        Text(
-                          'No answers or comments yet.',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: SlipTheme.steel),
+                        const Icon(Icons.forum_outlined, size: 36, color: SlipTheme.steelLight),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'No comments yet',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: SlipTheme.carbon),
                         ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Be the first peer to help explain this concept!',
-                          style: TextStyle(fontSize: 11, color: SlipTheme.steelLight),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Be the first to comment or answer!',
+                          style: TextStyle(fontSize: 11, color: SlipTheme.steel),
                         ),
                       ],
                     ),

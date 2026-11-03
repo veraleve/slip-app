@@ -137,6 +137,52 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  void _promptMeshConfirmation() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: SlipTheme.canvas,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'GUEST MESH SESSION',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.5,
+            color: SlipTheme.carbon,
+          ),
+        ),
+        content: const Text(
+          'Entering via Bluetooth mesh is temporary. Your session and device data will not be backed up to the cloud. If you clear app data, local notes and blunders will be lost.\n\nDo you want to proceed as a guest peer?',
+          style: TextStyle(
+            fontSize: 12.5,
+            color: SlipTheme.steel,
+            height: 1.45,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('CANCEL', style: TextStyle(color: SlipTheme.steel)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _enterViaMesh();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: SlipTheme.carbon,
+              foregroundColor: SlipTheme.canvas,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
+            child: const Text('PROCEED AS PEER'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -150,22 +196,30 @@ class _AuthScreenState extends State<AuthScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Clean Logo & Subtitle
-                  Text(
-                    'Slip',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: SlipTheme.carbon,
-                          letterSpacing: -0.5,
+                  // Centered Clean Logo & Subtitle
+                  Center(
+                    child: Column(
+                      children: [
+                        Text(
+                          'Slip',
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 36,
+                                color: SlipTheme.carbon,
+                                letterSpacing: -0.6,
+                              ),
                         ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Ask doubts. Learn from mistakes. Master together',
-                    style: TextStyle(
-                      color: SlipTheme.steel,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w500,
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Ask doubts. Learn from mistakes. Master together',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: SlipTheme.steel,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 32),
@@ -188,7 +242,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       final label = exam;
                       return InkWell(
                         onTap: () => _toggleExam(exam),
-                        borderRadius: BorderRadius.circular(3),
+                        borderRadius: BorderRadius.circular(16),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 8),
@@ -196,7 +250,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             color: isSelected
                                 ? SlipTheme.carbon
                                 : SlipTheme.surface,
-                            borderRadius: BorderRadius.circular(3),
+                            borderRadius: BorderRadius.circular(16),
                             border: Border.all(
                               color: isSelected
                                   ? SlipTheme.carbon
@@ -230,121 +284,76 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                   ),
 
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 24),
 
-                  // 1-TAP INSTANT MESH ACCESS
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: SlipTheme.surface,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: SlipTheme.hairline, width: 0.8),
-                    ),
-                    padding: const EdgeInsets.all(18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'OFFLINE PEER ACCESS',
-                          style:
-                              Theme.of(context).textTheme.labelSmall?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color: SlipTheme.steel,
-                                    letterSpacing: 0.8,
-                                  ),
+                  // Username Input (Curved)
+                  Text(
+                    'USERNAME',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                          color: SlipTheme.steel,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Enter instantly as an anonymous peer via BLE Mesh. No email or password needed.',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: SlipTheme.carbon,
-                                    height: 1.4,
-                                  ),
-                        ),
-                        const SizedBox(height: 14),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 44,
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _enterViaMesh,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: SlipTheme.carbon,
-                              foregroundColor: SlipTheme.canvas,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                              elevation: 0,
-                            ),
-                            child: _isLoading
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation(
-                                          SlipTheme.canvas),
-                                    ),
-                                  )
-                                : Text(
-                                    'ENTER VIA BLE MESH',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelMedium
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w700,
-                                          color: SlipTheme.canvas,
-                                          letterSpacing: 0.6,
-                                        ),
-                                  ),
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
-
-                  const SizedBox(height: 28),
-
-                  // Minimalist Divider
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Divider(color: SlipTheme.hairline, height: 1),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(
-                          'OR USE ACCOUNT',
-                          style:
-                              Theme.of(context).textTheme.labelSmall?.copyWith(
-                                    color: SlipTheme.steel,
-                                    fontSize: 10,
-                                    letterSpacing: 0.6,
-                                  ),
-                        ),
-                      ),
-                      const Expanded(
-                        child: Divider(color: SlipTheme.hairline, height: 1),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 22),
-
-                  // Username Input
-                  HairlineInput(
-                    label: 'USERNAME',
-                    hint: 'Choose your peer handle (e.g. arya)',
+                  const SizedBox(height: 6),
+                  TextField(
                     controller: _usernameController,
+                    style: const TextStyle(fontSize: 14, color: SlipTheme.carbon, fontWeight: FontWeight.w500),
+                    decoration: InputDecoration(
+                      hintText: 'Choose your peer handle (e.g. arya)',
+                      hintStyle: const TextStyle(fontSize: 13, color: SlipTheme.steelLight),
+                      filled: true,
+                      fillColor: SlipTheme.surface,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: SlipTheme.hairline, width: 0.8),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: SlipTheme.hairline, width: 0.8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: SlipTheme.carbon, width: 1.2),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 14),
 
-                  // Password Input
-                  HairlineInput(
-                    label: 'PASSWORD',
-                    hint: '••••••••',
-                    isPassword: true,
+                  // Password Input (Curved)
+                  Text(
+                    'PASSWORD',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                          color: SlipTheme.steel,
+                        ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
                     controller: _passwordController,
+                    obscureText: true,
+                    style: const TextStyle(fontSize: 14, color: SlipTheme.carbon, fontWeight: FontWeight.w500),
+                    decoration: InputDecoration(
+                      hintText: '••••••••',
+                      hintStyle: const TextStyle(fontSize: 13, color: SlipTheme.steelLight),
+                      filled: true,
+                      fillColor: SlipTheme.surface,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: SlipTheme.hairline, width: 0.8),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: SlipTheme.hairline, width: 0.8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: SlipTheme.carbon, width: 1.2),
+                      ),
+                    ),
                   ),
 
                   const SizedBox(height: 12),
@@ -359,7 +368,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           value: _rememberDevice,
                           activeColor: SlipTheme.carbon,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(6),
                           ),
                           onChanged: (val) {
                             setState(() => _rememberDevice = val ?? true);
@@ -394,7 +403,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   // Sign In / Create Account Button
                   SizedBox(
                     width: double.infinity,
-                    height: 46,
+                    height: 48,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _handleAuth,
                       style: ElevatedButton.styleFrom(
@@ -402,18 +411,23 @@ class _AuthScreenState extends State<AuthScreen> {
                         foregroundColor: SlipTheme.canvas,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      child: Text(
-                        _isSignUp ? 'CREATE ACCOUNT' : 'SIGN IN',
-                        style:
-                            Theme.of(context).textTheme.labelMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: SlipTheme.canvas,
-                                  letterSpacing: 0.6,
-                                ),
-                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: SlipTheme.canvas),
+                            )
+                          : Text(
+                              _isSignUp ? 'CREATE ACCOUNT' : 'SIGN IN',
+                              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: SlipTheme.canvas,
+                                    letterSpacing: 0.6,
+                                  ),
+                            ),
                     ),
                   ),
 
@@ -435,6 +449,29 @@ class _AuthScreenState extends State<AuthScreen> {
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: SlipTheme.steel,
                             ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Subtle Small Enter via Bluetooth Mesh
+                  Center(
+                    child: OutlinedButton(
+                      onPressed: _isLoading ? null : _promptMeshConfirmation,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: SlipTheme.carbon,
+                        side: const BorderSide(color: SlipTheme.hairline, width: 0.8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      ),
+                      child: const Text(
+                        'Enter via Bluetooth mesh',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: SlipTheme.steel,
+                        ),
                       ),
                     ),
                   ),
