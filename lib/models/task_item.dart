@@ -9,6 +9,8 @@ class TaskItem {
   final List<String> topics;
   final DateTime scheduledAt;
   final bool isCompleted;
+  final bool isStarred;
+  final String listName;
   final DateTime createdAt;
 
   const TaskItem({
@@ -19,6 +21,8 @@ class TaskItem {
     this.topics = const [],
     required this.scheduledAt,
     this.isCompleted = false,
+    this.isStarred = false,
+    this.listName = 'My Tasks',
     required this.createdAt,
   });
 
@@ -30,6 +34,8 @@ class TaskItem {
     List<String>? topics,
     DateTime? scheduledAt,
     bool? isCompleted,
+    bool? isStarred,
+    String? listName,
     DateTime? createdAt,
   }) {
     return TaskItem(
@@ -40,6 +46,8 @@ class TaskItem {
       topics: topics ?? this.topics,
       scheduledAt: scheduledAt ?? this.scheduledAt,
       isCompleted: isCompleted ?? this.isCompleted,
+      isStarred: isStarred ?? this.isStarred,
+      listName: listName ?? this.listName,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -53,6 +61,8 @@ class TaskItem {
       'topics': topics,
       'scheduled_at': scheduledAt.toIso8601String(),
       'is_completed': isCompleted,
+      'is_starred': isStarred,
+      'list_name': listName,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -75,6 +85,8 @@ class TaskItem {
           ? DateTime.tryParse(json['scheduled_at'] as String) ?? DateTime.now()
           : DateTime.now(),
       isCompleted: json['is_completed'] as bool? ?? false,
+      isStarred: json['is_starred'] as bool? ?? false,
+      listName: json['list_name'] as String? ?? 'My Tasks',
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'] as String) ?? DateTime.now()
           : DateTime.now(),

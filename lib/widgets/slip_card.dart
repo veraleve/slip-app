@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../models/slip.dart';
 import '../theme/slip_theme.dart';
 import 'audio_waveform_strip.dart';
@@ -32,6 +33,24 @@ class SlipCard extends StatefulWidget {
 class _SlipCardState extends State<SlipCard> {
   bool _showComments = false;
 
+  String _formatInstagramTime(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inSeconds < 60) {
+      return 'just now';
+    } else if (diff.inMinutes < 60) {
+      return '${diff.inMinutes}m';
+    } else if (diff.inHours < 24) {
+      return '${diff.inHours}h';
+    } else if (diff.inDays < 7) {
+      return '${diff.inDays}d';
+    } else if (diff.inDays < 30) {
+      final weeks = (diff.inDays / 7).floor();
+      return '${weeks}w';
+    } else {
+      return DateFormat('MMM d').format(dt);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final slip = widget.slip;
@@ -48,7 +67,7 @@ class _SlipCardState extends State<SlipCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Author Handle, Post Type Badges & Exam Tag
+          // 1. Author Handle, Timestamp, Post Type Badges & Exam Tag
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -91,6 +110,17 @@ class _SlipCardState extends State<SlipCard> {
                           ),
                         ),
                       ],
+                    ),
+                  ),
+
+                  // Instagram Style Date & Time
+                  const SizedBox(width: 4),
+                  Text(
+                    '· ${_formatInstagramTime(slip.createdAt)}',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: SlipTheme.steel,
                     ),
                   ),
 

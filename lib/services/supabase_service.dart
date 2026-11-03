@@ -20,10 +20,12 @@ class SupabaseService {
 
   Future<void> initialize() async {
     try {
-      _client = SupabaseClient(
-        AppConstants.supabaseUrl,
-        AppConstants.supabaseAnonKey,
-      );
+      if (AppConstants.supabaseAnonKey.isNotEmpty) {
+        _client = SupabaseClient(
+          AppConstants.supabaseUrl,
+          AppConstants.supabaseAnonKey,
+        );
+      }
 
       // Restore cached session
       final prefs = await SharedPreferences.getInstance();
@@ -227,7 +229,7 @@ class SupabaseService {
     return RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(str);
   }
 
-  // --- LOCAL-FIRST OFFLINE STORAGE FOR USER SLIPS ---
+  // --- LOCAL-FIRST OFFLINE STORAGE & DELTA SYNC ---
   Future<List<Slip>> loadLocalUserSlips() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -247,6 +249,78 @@ class SupabaseService {
     } catch (_) {}
   }
 
+  Future<List<Slip>> loadSavedPeerSlips() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rawList = prefs.getStringList('slip_saved_peer_slips') ?? [];
+      return rawList.map((str) => Slip.fromJson(jsonDecode(str) as Map<String, dynamic>)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> saveSavedPeerSlips(List<Slip> slips) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final List<String> rawList = slips.map((s) => jsonEncode(s.toJson())).toList();
+      await prefs.setStringList('slip_saved_peer_slips', rawList);
+    } catch (_) {}
+  }
+
+  Future<Set<String>> getSavedSlipIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('slip_saved_slip_ids') ?? [];
+      return list.toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> setSlipSaved(Slip slip, bool isSaved) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedIds = (prefs.getStringList('slip_saved_slip_ids') ?? []).toSet();
+      if (isSaved) {
+        savedIds.add(slip.id);
+      } else {
+        savedIds.remove(slip.id);
+      }
+      await prefs.setStringList('slip_saved_slip_ids', savedIds.toList());
+
+      // Update saved slips cache
+      final savedSlips = await loadSavedPeerSlips();
+      savedSlips.removeWhere((s) => s.id == slip.id);
+      if (isSaved) {
+        savedSlips.insert(0, slip.copyWith(hasKept: true));
+      }
+      await saveSavedPeerSlips(savedSlips);
+
+      // Record interaction on Supabase
+      if (isSaved) {
+        await recordInteraction(slipId: slip.id, interactionType: 'keep');
+      }
+    } catch (_) {}
+  }
+
+  Future<List<Slip>> loadCachedFeed() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rawList = prefs.getStringList('slip_cached_public_feed') ?? [];
+      return rawList.map((str) => Slip.fromJson(jsonDecode(str) as Map<String, dynamic>)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> saveCachedFeed(List<Slip> slips) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final List<String> rawList = slips.take(150).map((s) => jsonEncode(s.toJson())).toList();
+      await prefs.setStringList('slip_cached_public_feed', rawList);
+    } catch (_) {}
+  }
+
   Future<List<Slip>> fetchStream({
     String? topicFilter,
     String? subtopicFilter,
@@ -257,92 +331,102 @@ class SupabaseService {
         ? userPapers
         : _targetExams;
 
-    // 1. Always load local user slips first (instant offline availability)
+    // 1. Instant Local Load: load local slips, saved peer slips, and cached feed
     final localUserSlips = await loadLocalUserSlips();
+    final savedPeerSlips = await loadSavedPeerSlips();
+    final cachedFeed = await loadCachedFeed();
+    final savedIds = await getSavedSlipIds();
 
-    if (_client == null) {
-      final mock = MockDataService.getInitialSlips();
-      var combined = [...localUserSlips, ...mock.where((s) => allowedPapers.contains(s.examTag))];
-      if (postTypeFilter != null) {
-        combined = combined.where((s) => s.postType == postTypeFilter).toList();
-      }
-      if (topicFilter != null && topicFilter.isNotEmpty && topicFilter != 'All' && topicFilter != 'For You') {
-        combined = combined.where((s) => s.topic == topicFilter).toList();
-      }
-      if (subtopicFilter != null && subtopicFilter.isNotEmpty && subtopicFilter != 'All Topics') {
-        combined = combined.where((s) => s.subtopic == subtopicFilter).toList();
-      }
-      return combined;
+    final Map<String, Slip> combinedMap = {};
+    for (final s in cachedFeed) {
+      combinedMap[s.id] = s;
+    }
+    for (final s in savedPeerSlips) {
+      combinedMap[s.id] = s.copyWith(hasKept: true);
+    }
+    for (final s in localUserSlips) {
+      combinedMap[s.id] = s;
     }
 
-    try {
-      var query = _client!.from('slips').select();
-
-      // Strict Paper Isolation: only fetch slips matching user's registered papers
-      if (allowedPapers.length == 1) {
-        query = query.eq('exam_tag', allowedPapers.first);
-      } else if (allowedPapers.length > 1) {
-        query = query.inFilter('exam_tag', allowedPapers);
+    // Ensure saved state is accurately reflected
+    for (final entry in combinedMap.entries) {
+      if (savedIds.contains(entry.key)) {
+        combinedMap[entry.key] = entry.value.copyWith(hasKept: true);
       }
-
-      if (postTypeFilter != null) {
-        query = query.eq('post_type', postTypeFilter.name);
-      }
-
-      if (topicFilter != null && topicFilter.isNotEmpty && topicFilter != 'All' && topicFilter != 'For You') {
-        query = query.eq('topic', topicFilter);
-      }
-
-      if (subtopicFilter != null && subtopicFilter.isNotEmpty && subtopicFilter != 'All Topics') {
-        query = query.eq('subtopic', subtopicFilter);
-      }
-
-      final response = await query
-          .order('created_at', ascending: false)
-          .limit(60);
-      final list = response as List;
-
-      final fetched = list
-          .map((item) => Slip.fromJson(item as Map<String, dynamic>))
-          .toList();
-
-      final Map<String, Slip> merged = {};
-      for (final s in localUserSlips) {
-        merged[s.id] = s;
-      }
-      for (final s in fetched) {
-        merged[s.id] = s;
-      }
-
-      var result = merged.values.toList();
-      result.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-      if (postTypeFilter != null) {
-        result = result.where((s) => s.postType == postTypeFilter).toList();
-      }
-      if (topicFilter != null && topicFilter.isNotEmpty && topicFilter != 'All' && topicFilter != 'For You') {
-        result = result.where((s) => s.topic == topicFilter).toList();
-      }
-      if (subtopicFilter != null && subtopicFilter.isNotEmpty && subtopicFilter != 'All Topics') {
-        result = result.where((s) => s.subtopic == subtopicFilter).toList();
-      }
-
-      return result;
-    } catch (e) {
-      // Offline fallback: return user's local slips + mock data
-      final mock = MockDataService.getInitialSlips();
-      var combined = [...localUserSlips, ...mock.where((s) => allowedPapers.contains(s.examTag))];
-      if (postTypeFilter != null) {
-        combined = combined.where((s) => s.postType == postTypeFilter).toList();
-      }
-      if (topicFilter != null && topicFilter.isNotEmpty && topicFilter != 'All' && topicFilter != 'For You') {
-        combined = combined.where((s) => s.topic == topicFilter).toList();
-      }
-      if (subtopicFilter != null && subtopicFilter.isNotEmpty && subtopicFilter != 'All Topics') {
-        combined = combined.where((s) => s.subtopic == subtopicFilter).toList();
-      }
-      return combined;
     }
+
+    // 2. Network Sync / Delta Sync with Supabase
+    if (_client != null) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final lastSyncIso = prefs.getString('slip_last_sync_timestamp');
+
+        var query = _client!.from('slips').select();
+
+        // Strict Paper Isolation
+        if (allowedPapers.length == 1) {
+          query = query.eq('exam_tag', allowedPapers.first);
+        } else if (allowedPapers.length > 1) {
+          query = query.inFilter('exam_tag', allowedPapers);
+        }
+
+        // DELTA SYNC: If user already has cached data and a lastSync timestamp, only fetch new records!
+        if (lastSyncIso != null && cachedFeed.isNotEmpty) {
+          query = query.gt('created_at', lastSyncIso).order('created_at', ascending: false).limit(60);
+        } else {
+          query = query.order('created_at', ascending: false).limit(60);
+        }
+
+        final response = await query;
+        final list = response as List;
+
+        if (list.isNotEmpty) {
+          DateTime? latestCreated;
+          for (final item in list) {
+            final slip = Slip.fromJson(item as Map<String, dynamic>);
+            combinedMap[slip.id] = slip.copyWith(hasKept: savedIds.contains(slip.id));
+            if (latestCreated == null || slip.createdAt.isAfter(latestCreated)) {
+              latestCreated = slip.createdAt;
+            }
+          }
+
+          if (latestCreated != null) {
+            await prefs.setString('slip_last_sync_timestamp', latestCreated.toUtc().toIso8601String());
+          }
+
+          // Cache the updated feed for instant offline access
+          final sortedForCache = combinedMap.values.where((s) => s.isPublic).toList();
+          sortedForCache.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          await saveCachedFeed(sortedForCache);
+        }
+      } catch (_) {
+        // Offline or connection failure: gracefully proceed with cached data
+      }
+    }
+
+    // 3. Fallback to mock data if empty (first install with no network)
+    if (combinedMap.isEmpty) {
+      final mock = MockDataService.getInitialSlips();
+      for (final s in mock.where((m) => allowedPapers.contains(m.examTag))) {
+        combinedMap[s.id] = s;
+      }
+    }
+
+    // 4. Filter and Sort by createdAt descending (newest posts at top)
+    var result = combinedMap.values.toList();
+    result.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    if (postTypeFilter != null) {
+      result = result.where((s) => s.postType == postTypeFilter).toList();
+    }
+    if (topicFilter != null && topicFilter.isNotEmpty && topicFilter != 'All' && topicFilter != 'For You') {
+      result = result.where((s) => s.topic == topicFilter).toList();
+    }
+    if (subtopicFilter != null && subtopicFilter.isNotEmpty && subtopicFilter != 'All Topics') {
+      result = result.where((s) => s.subtopic == subtopicFilter).toList();
+    }
+
+    return result;
   }
 
   Future<void> recordInteraction({
@@ -366,6 +450,14 @@ class SupabaseService {
     local.insert(0, slip);
     await saveLocalUserSlips(local);
 
+    // Also insert into cached public feed if public
+    if (slip.isPublic) {
+      final cached = await loadCachedFeed();
+      cached.removeWhere((s) => s.id == slip.id);
+      cached.insert(0, slip);
+      await saveCachedFeed(cached);
+    }
+
     if (_client == null) return true;
     try {
       String? validAuthorId;
@@ -388,6 +480,7 @@ class SupabaseService {
         'author_id': validAuthorId,
         'author_handle': slip.authorUsername ?? _currentUsername ?? 'peer',
         'audio_duration_seconds': slip.audioDurationSeconds,
+        'created_at': slip.createdAt.toUtc().toIso8601String(),
       });
       return true;
     } catch (_) {

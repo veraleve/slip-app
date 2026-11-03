@@ -88,7 +88,7 @@ class Slip {
     return Slip(
       id: json['id'] as String,
       authorId: json['author_id'] as String?,
-      authorUsername: json['author_username'] as String?,
+      authorUsername: (json['author_username'] as String?) ?? (json['author_handle'] as String?),
       isPublic: json['is_public'] as bool? ?? true,
       postType: parsedType,
       title: json['title'] as String?,

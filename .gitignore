@@ -49,6 +49,16 @@ migrate_working_dir/
 # Coverage
 coverage/
 
+# Environment & Secrets
+.env
+.env.*
+*.env
+lib/constants/secrets.dart
+lib/constants/env_config.dart
+*.key
+*.pem
+secrets.json
+
 # Build
 build/
 .dart_tool/

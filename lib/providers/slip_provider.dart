@@ -30,17 +30,27 @@ class SlipProvider extends ChangeNotifier {
     }
 
     if (_selectedTopicFilter == 'For You') {
-      // Prioritize recommended peer blunders & doubts (unmastered, high sameCount, recent)
+      // Prioritize fresh posts and recommended peer blunders & doubts
       final recs = List<Slip>.from(result);
+      final now = DateTime.now();
       recs.sort((a, b) {
-        final aScore = (a.sameCount * 2) + (a.keepCount * 3) - (a.hasCleared ? 10 : 0);
-        final bScore = (b.sameCount * 2) + (b.keepCount * 3) - (b.hasCleared ? 10 : 0);
-        return bScore.compareTo(aScore);
+        final hoursA = now.difference(a.createdAt).inHours;
+        final hoursB = now.difference(b.createdAt).inHours;
+        // Strong recency boost: brand-new posts appear directly at top
+        final freshA = hoursA < 1 ? 500 : (hoursA < 6 ? 200 : (hoursA < 24 ? 60 : 0));
+        final freshB = hoursB < 1 ? 500 : (hoursB < 6 ? 200 : (hoursB < 24 ? 60 : 0));
+
+        final aScore = freshA + (a.sameCount * 2) + (a.keepCount * 3) - (a.hasCleared ? 20 : 0);
+        final bScore = freshB + (b.sameCount * 2) + (b.keepCount * 3) - (b.hasCleared ? 20 : 0);
+        if (aScore != bScore) return bScore.compareTo(aScore);
+        return b.createdAt.compareTo(a.createdAt);
       });
       return recs;
     } else if (_selectedTopicFilter != 'All' && _selectedSubjectFilter == 'All') {
       result = result.where((s) => s.topic == _selectedTopicFilter).toList();
     }
+
+    result.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return result;
   }
 
@@ -69,8 +79,14 @@ class SlipProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  List<String> _customLists = [];
+  List<String> get customLists => List.unmodifiable(_customLists);
+
   // --- TASKS / MOCK TEST REMINDER ENGINE ---
   Future<void> _loadTasks() async {
+    final prefs = await SharedPreferences.getInstance();
+    _customLists = prefs.getStringList('slip_custom_task_lists') ?? [];
+
     final raw = await _service.loadTasksRaw();
     if (raw.isNotEmpty) {
       _tasks = raw.map((str) => TaskItem.deserialize(str)).toList();
@@ -115,24 +131,94 @@ class SlipProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> toggleTaskStarred(String taskId) async {
+    final index = _tasks.indexWhere((t) => t.id == taskId);
+    if (index == -1) return;
+    final current = _tasks[index];
+    _tasks[index] = current.copyWith(isStarred: !current.isStarred);
+    await _persistTasks();
+    notifyListeners();
+  }
+
+  Future<void> addTaskList(String name) async {
+    final clean = name.trim();
+    if (clean.isEmpty || clean == 'My Tasks' || clean == 'Starred' || _customLists.contains(clean)) return;
+    _customLists.add(clean);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('slip_custom_task_lists', _customLists);
+    notifyListeners();
+  }
+
+  Future<void> deleteTaskList(String name) async {
+    _customLists.remove(name);
+    for (int i = 0; i < _tasks.length; i++) {
+      if (_tasks[i].listName == name) {
+        _tasks[i] = _tasks[i].copyWith(listName: 'My Tasks');
+      }
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('slip_custom_task_lists', _customLists);
+    await _persistTasks();
+    notifyListeners();
+  }
+
+  Future<void> renameTaskList(String oldName, String newName) async {
+    final clean = newName.trim();
+    if (clean.isEmpty || clean == oldName) return;
+    final idx = _customLists.indexOf(oldName);
+    if (idx != -1) {
+      _customLists[idx] = clean;
+    }
+    for (int i = 0; i < _tasks.length; i++) {
+      if (_tasks[i].listName == oldName) {
+        _tasks[i] = _tasks[i].copyWith(listName: clean);
+      }
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('slip_custom_task_lists', _customLists);
+    await _persistTasks();
+    notifyListeners();
+  }
+
   Future<void> deleteTask(String taskId) async {
     _tasks.removeWhere((t) => t.id == taskId);
     await _persistTasks();
     notifyListeners();
   }
 
+  Future<void> deleteMultipleTasks(Iterable<String> taskIds) async {
+    final idSet = taskIds.toSet();
+    _tasks.removeWhere((t) => idSet.contains(t.id));
+    await _persistTasks();
+    notifyListeners();
+  }
+
   // Cross-reference blunders relevant to a task's subject & syllabus topics
+  // Includes blunders authored by user AND blunders saved by user from peers
   List<Slip> getBlundersForTask(TaskItem task) {
     return _slips.where((slip) {
       // Match exam
       if (slip.examTag != task.examTag) return false;
+
+      // Must be a blunder/mistake OR saved by user from peer feed
+      final isBlunder = slip.postType == PostType.mistake || slip.hasKept;
+      if (!isBlunder) return false;
+
       // Match subject
       final matchesSubject = slip.topic.trim().toLowerCase() == task.subject.trim().toLowerCase();
-      // Match topics
-      final matchesTopics = task.topics.any((topic) =>
-          (slip.subtopic != null && slip.subtopic!.toLowerCase().contains(topic.toLowerCase())) ||
-          slip.trapStatement.toLowerCase().contains(topic.toLowerCase()));
-      return matchesSubject || matchesTopics;
+      if (!matchesSubject) return false;
+
+      // If task has specific subtopics (not empty, and not 'All Topics')
+      if (task.topics.isNotEmpty && !task.topics.contains('All Topics')) {
+        final matchesTopics = task.topics.any((topic) =>
+            (slip.subtopic != null && slip.subtopic!.toLowerCase().contains(topic.toLowerCase())) ||
+            slip.trapStatement.toLowerCase().contains(topic.toLowerCase()) ||
+            (slip.title != null && slip.title!.toLowerCase().contains(topic.toLowerCase())));
+        return matchesTopics;
+      }
+
+      // If 'All Topics' or no subtopic restriction, all subject blunders (authored + saved) match
+      return true;
     }).toList();
   }
 
@@ -210,7 +296,7 @@ class SlipProvider extends ChangeNotifier {
   }
 
   // 3. Keep (Save to revision)
-  void toggleKeep(String slipId) {
+  Future<void> toggleKeep(String slipId) async {
     final index = _slips.indexWhere((s) => s.id == slipId);
     if (index == -1) return;
 
@@ -218,15 +304,14 @@ class SlipProvider extends ChangeNotifier {
     final newState = !current.hasKept;
     final newCount = newState ? current.keepCount + 1 : current.keepCount - 1;
 
-    _slips[index] = current.copyWith(
+    final updated = current.copyWith(
       hasKept: newState,
       keepCount: newCount < 0 ? 0 : newCount,
     );
+    _slips[index] = updated;
     notifyListeners();
 
-    if (newState) {
-      _service.recordInteraction(slipId: slipId, interactionType: 'keep');
-    }
+    await _service.setSlipSaved(updated, newState);
   }
 
   // 4. Cleared (Mastered)

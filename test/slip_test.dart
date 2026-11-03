@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slip/models/slip.dart';
+import 'package:slip/models/task_item.dart';
 import 'package:slip/providers/slip_provider.dart';
 import 'package:slip/services/mock_data_service.dart';
 
@@ -80,6 +81,29 @@ void main() {
     });
   });
 
+  group('TaskItem Model Tests', () {
+    test('TaskItem supports isStarred and custom listName', () {
+      final now = DateTime.now();
+      final task = TaskItem(
+        id: 'task-01',
+        title: 'Do probability homework',
+        subject: 'Engineering Mathematics',
+        topics: ['Probability & Statistics'],
+        scheduledAt: now.add(const Duration(days: 1)),
+        isStarred: true,
+        listName: 'Homework',
+        createdAt: now,
+      );
+
+      final json = task.toJson();
+      final reconstructed = TaskItem.fromJson(json);
+
+      expect(reconstructed.id, equals('task-01'));
+      expect(reconstructed.isStarred, isTrue);
+      expect(reconstructed.listName, equals('Homework'));
+    });
+  });
+
   group('MockDataService Tests', () {
     test('Initial slips contain high-yield GATE CS blunders', () {
       final initialSlips = MockDataService.getInitialSlips();
@@ -109,6 +133,27 @@ void main() {
       final fixRevealedSlip =
           provider.slips.firstWhere((s) => s.id == firstId);
       expect(fixRevealedSlip.isFixRevealed, isTrue);
+    });
+
+    test('Saved peer mistakes appear in getBlundersForTask traps', () async {
+      final provider = SlipProvider();
+      await provider.init();
+
+      // Find or create a peer slip in Linear Algebra
+      final peerSlip = provider.slips.firstWhere((s) => s.topic == 'Linear Algebra');
+      await provider.toggleKeep(peerSlip.id);
+
+      final task = TaskItem(
+        id: 'task-test',
+        title: 'Linear Algebra Test',
+        subject: 'Linear Algebra',
+        topics: ['All Topics'],
+        scheduledAt: DateTime.now().add(const Duration(days: 1)),
+        createdAt: DateTime.now(),
+      );
+
+      final traps = provider.getBlundersForTask(task);
+      expect(traps.any((t) => t.id == peerSlip.id), isTrue);
     });
   });
 }
