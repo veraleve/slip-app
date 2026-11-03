@@ -95,4 +95,38 @@ class NativeDeviceService {
       return false;
     }
   }
+
+  // --- NATIVE IN-APP APK INSTALLATION & CACHE DIRECTORY ---
+  static Future<String?> getAppCacheDir() async {
+    try {
+      final res = await _channel.invokeMethod<String>('getAppCacheDir');
+      return res;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<bool> canRequestPackageInstalls() async {
+    try {
+      final res = await _channel.invokeMethod<bool>('canRequestPackageInstalls');
+      return res ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  static Future<void> openInstallUnknownAppsSettings() async {
+    try {
+      await _channel.invokeMethod<void>('openInstallUnknownAppsSettings');
+    } catch (_) {}
+  }
+
+  static Future<bool> installApk(String filePath) async {
+    try {
+      final res = await _channel.invokeMethod<bool>('installApk', {'filePath': filePath});
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
 }

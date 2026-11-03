@@ -65,13 +65,15 @@ jobs:
           tag_name: ${{ steps.get_tag.outputs.TAG_NAME }}
           name: "Slip Release ${{ steps.get_tag.outputs.TAG_NAME }}"
           body: |
-            ## Slip — Learn From Others' Exam Blunders
-            
-            ### Automated Open-Source Release
-            - Built with Flutter 3.24.5 on Ubuntu Runner
-            - Integrated with `slip-backend` Supabase (ap-south-1 Mumbai)
-            - Features: Reddit-style post details, threaded comments with OP Author chip, native audio recording/playback, Google Tasks redesign with elevated FAB, delta sync & lazy loading, curved UI.
-            
+            ## Slip — Ask doubts. Learn from mistakes. Master together.
+
+            ### What's New in this Release:
+            - In-App Self-Updater: Check for updates and install directly from GitHub Releases with zero data loss.
+            - Deep Post Detail: Tap any blunder card to view full explanations, high-res photos, voice notes, and discussion threads.
+            - Tasks Scheduler: Google Tasks layout rendered directly on canvas with mistaking inoculation traps.
+            - Session Persistence: Persistent authentication via SharedPreferences—no repeated login prompts upon reopen.
+            - Clean Swiss UI: Left-aligned action buttons (reactions, comments, cleared), right-aligned save icon, curved surfaces.
+
             **Direct Download:** `slip.apk`
           files: build/app/outputs/flutter-apk/slip.apk
           draft: false

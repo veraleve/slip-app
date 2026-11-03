@@ -61,9 +61,7 @@ class SupabaseService {
   }
 
   SupabaseClient? get client => _client;
-  bool get isAuthenticated =>
-      _isLoggedIn ||
-      (_rememberDevice && _currentUsername != null && _currentUsername!.isNotEmpty);
+  bool get isAuthenticated => _isLoggedIn;
   bool get isLoggedIn => _isLoggedIn;
   bool get rememberDevice => _rememberDevice;
   String? get savedUsername => _savedUsername ?? _currentUsername;

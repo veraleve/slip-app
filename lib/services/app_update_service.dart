@@ -1,0 +1,240 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'native_device_service.dart';
+
+class AppReleaseInfo {
+  final String tagName;
+  final String name;
+  final String body;
+  final DateTime publishedAt;
+  final String apkDownloadUrl;
+  final int apkSizeBytes;
+
+  const AppReleaseInfo({
+    required this.tagName,
+    required this.name,
+    required this.body,
+    required this.publishedAt,
+    required this.apkDownloadUrl,
+    required this.apkSizeBytes,
+  });
+
+  String get versionClean => tagName.replaceFirst(RegExp(r'^[vV]'), '');
+
+  String get sizeDisplay {
+    if (apkSizeBytes <= 0) return 'Unknown size';
+    final mb = apkSizeBytes / (1024 * 1024);
+    return '${mb.toStringAsFixed(1)} MB';
+  }
+
+  bool isNewerThan(String currentVersion) {
+    try {
+      final curParts = currentVersion.replaceFirst(RegExp(r'^[vV]'), '').split('+').first.split('.').map(int.parse).toList();
+      final remoteParts = versionClean.split('+').first.split('.').map(int.parse).toList();
+
+      for (int i = 0; i < 3; i++) {
+        final cur = i < curParts.length ? curParts[i] : 0;
+        final rem = i < remoteParts.length ? remoteParts[i] : 0;
+        if (rem > cur) return true;
+        if (rem < cur) return false;
+      }
+      return false;
+    } catch (_) {
+      return versionClean != currentVersion;
+    }
+  }
+
+  factory AppReleaseInfo.fromJson(Map<String, dynamic> json) {
+    final tagName = json['tag_name'] as String? ?? 'v0.0.0';
+    final name = json['name'] as String? ?? 'Slip Update';
+    final body = json['body'] as String? ?? 'No release notes provided.';
+    final publishedAtStr = json['published_at'] as String?;
+    final publishedAt = publishedAtStr != null ? DateTime.tryParse(publishedAtStr) ?? DateTime.now() : DateTime.now();
+
+    final assets = json['assets'] as List<dynamic>? ?? [];
+    String? downloadUrl;
+    int size = 0;
+
+    for (final asset in assets) {
+      if (asset is Map<String, dynamic>) {
+        final assetName = (asset['name'] as String? ?? '').toLowerCase();
+        if (assetName.endsWith('.apk')) {
+          downloadUrl = asset['browser_download_url'] as String?;
+          size = (asset['size'] as num?)?.toInt() ?? 0;
+          if (assetName == 'slip.apk') {
+            break; // Highest priority asset match
+          }
+        }
+      }
+    }
+
+    if (downloadUrl == null) {
+      throw Exception('No APK binary found in GitHub release assets.');
+    }
+
+    return AppReleaseInfo(
+      tagName: tagName,
+      name: name,
+      body: body,
+      publishedAt: publishedAt,
+      apkDownloadUrl: downloadUrl,
+      apkSizeBytes: size,
+    );
+  }
+}
+
+class AppUpdateProgress {
+  final double progress; // 0.0 to 1.0
+  final int receivedBytes;
+  final int totalBytes;
+  final bool isCompleted;
+  final String? error;
+
+  const AppUpdateProgress({
+    required this.progress,
+    required this.receivedBytes,
+    required this.totalBytes,
+    this.isCompleted = false,
+    this.error,
+  });
+
+  String get receivedDisplay => '${(receivedBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  String get totalDisplay => totalBytes > 0 ? '${(totalBytes / (1024 * 1024)).toStringAsFixed(1)} MB' : '...';
+  int get percentInt => (progress * 100).clamp(0, 100).toInt();
+}
+
+class AppUpdateService {
+  static const String currentVersion = '0.1.7';
+  static const String githubRepo = 'veraleve/slip-app';
+  static const String releaseApiUrl = 'https://api.github.com/repos/$githubRepo/releases/latest';
+
+  static AppUpdateService? _instance;
+  factory AppUpdateService() => _instance ??= AppUpdateService._();
+  AppUpdateService._();
+
+  // Check GitHub releases for newer version
+  Future<AppReleaseInfo?> checkForUpdate() async {
+    final client = HttpClient();
+    client.connectionTimeout = const Duration(seconds: 12);
+    try {
+      final uri = Uri.parse(releaseApiUrl);
+      final request = await client.getUrl(uri);
+      request.headers.set('User-Agent', 'slip-app-updater');
+      request.headers.set('Accept', 'application/vnd.github.v3+json');
+
+      final response = await request.close();
+      if (response.statusCode != 200) {
+        throw Exception('GitHub API responded with status ${response.statusCode}');
+      }
+
+      final bodyStr = await response.transform(utf8.decoder).join();
+      final Map<String, dynamic> data = jsonDecode(bodyStr);
+      return AppReleaseInfo.fromJson(data);
+    } catch (e) {
+      debugPrint('Check update error: $e');
+      rethrow;
+    } finally {
+      client.close();
+    }
+  }
+
+  // Stream APK download and return downloaded file path upon completion
+  Stream<AppUpdateProgress> downloadAndTrack(
+    String downloadUrl, {
+    required Function(String filePath) onComplete,
+  }) async* {
+    final client = HttpClient();
+    client.connectionTimeout = const Duration(seconds: 20);
+
+    try {
+      final cacheDir = await NativeDeviceService.getAppCacheDir() ?? Directory.systemTemp.path;
+      final targetFile = File('$cacheDir/slip_update.apk');
+
+      if (await targetFile.exists()) {
+        try {
+          await targetFile.delete();
+        } catch (_) {}
+      }
+
+      // Resolve redirects manually if needed
+      Uri currentUri = Uri.parse(downloadUrl);
+      HttpClientResponse? response;
+      int redirects = 0;
+
+      while (redirects < 5) {
+        final request = await client.getUrl(currentUri);
+        request.headers.set('User-Agent', 'slip-app-updater');
+        request.followRedirects = false; // We handle redirects directly for exact content-length
+        response = await request.close();
+
+        if (response.statusCode == 301 ||
+            response.statusCode == 302 ||
+            response.statusCode == 303 ||
+            response.statusCode == 307 ||
+            response.statusCode == 308) {
+          final location = response.headers.value(HttpHeaders.locationHeader);
+          if (location != null) {
+            currentUri = Uri.parse(location);
+            redirects++;
+            continue;
+          }
+        }
+        break;
+      }
+
+      if (response == null || response.statusCode != 200) {
+        yield AppUpdateProgress(
+          progress: 0,
+          receivedBytes: 0,
+          totalBytes: 0,
+          error: 'Download failed (HTTP ${response?.statusCode})',
+        );
+        return;
+      }
+
+      final totalBytes = response.contentLength;
+      int receivedBytes = 0;
+      final sink = targetFile.openWrite();
+
+      await for (final chunk in response) {
+        receivedBytes += chunk.length;
+        sink.add(chunk);
+
+        final progress = totalBytes > 0 ? (receivedBytes / totalBytes) : 0.0;
+        yield AppUpdateProgress(
+          progress: progress,
+          receivedBytes: receivedBytes,
+          totalBytes: totalBytes,
+        );
+      }
+
+      await sink.flush();
+      await sink.close();
+
+      yield AppUpdateProgress(
+        progress: 1.0,
+        receivedBytes: receivedBytes,
+        totalBytes: totalBytes,
+        isCompleted: true,
+      );
+
+      onComplete(targetFile.path);
+    } catch (e) {
+      yield AppUpdateProgress(
+        progress: 0,
+        receivedBytes: 0,
+        totalBytes: 0,
+        error: e.toString(),
+      );
+    } finally {
+      client.close();
+    }
+  }
+
+  // Launch package installer
+  Future<bool> installApk(String filePath) async {
+    return await NativeDeviceService.installApk(filePath);
+  }
+}

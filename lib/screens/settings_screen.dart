@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../constants/app_constants.dart';
 import '../constants/gate_syllabus.dart';
+import '../services/app_update_service.dart';
 import '../services/native_device_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/slip_theme.dart';
@@ -119,6 +121,124 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _checkUpdates() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const _CheckingUpdatesDialog(),
+    );
+
+    try {
+      final info = await AppUpdateService().checkForUpdate();
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop(); // Dismiss loading
+
+      if (info == null) {
+        _showUpdateError('No release information available on GitHub.');
+        return;
+      }
+
+      final hasUpdate = info.isNewerThan(AppUpdateService.currentVersion);
+
+      if (!hasUpdate) {
+        _showUpToDateDialog(info);
+      } else {
+        _showUpdateAvailableDialog(info);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop(); // Dismiss loading
+      _showUpdateError('Could not connect to GitHub Releases.\nPlease check your network connection.');
+    }
+  }
+
+  void _showUpdateError(String message) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: SlipTheme.canvas,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'UPDATE CHECK',
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.5),
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(fontSize: 12.5, color: SlipTheme.steel, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('OK', style: TextStyle(color: SlipTheme.carbon, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showUpToDateDialog(AppReleaseInfo info) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: SlipTheme.canvas,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle_outline_rounded, color: SlipTheme.clearedGreen, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'SLIP IS UP TO DATE',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.5),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'You are running version v${AppUpdateService.currentVersion}.',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: SlipTheme.carbon),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Latest Release: ${info.tagName}\nPublished: ${DateFormat.yMMMd().format(info.publishedAt)}',
+              style: const TextStyle(fontSize: 12, color: SlipTheme.steel, height: 1.4),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('OK', style: TextStyle(color: SlipTheme.carbon, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showUpdateAvailableDialog(AppReleaseInfo info) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => _UpdateAvailableModal(
+        info: info,
+        onStartUpdate: () {
+          Navigator.of(ctx).pop();
+          _startUpdateDownload(info);
+        },
+      ),
+    );
+  }
+
+  void _startUpdateDownload(AppReleaseInfo info) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _DownloadProgressModal(info: info),
     );
   }
 
@@ -317,6 +437,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onSignOut: _confirmSignOut,
                   ),
                 ),
+              ),
+              const _GroupDivider(),
+              _SettingGroupTile(
+                icon: Icons.system_update_alt_rounded,
+                iconColor: SlipTheme.carbon,
+                title: 'Check for Updates',
+                subtitle: 'Slip v${AppUpdateService.currentVersion} • GitHub Releases',
+                onTap: _checkUpdates,
               ),
               const _GroupDivider(),
               _SettingGroupTile(
@@ -1095,9 +1223,9 @@ class _AboutSettingsPage extends StatelessWidget {
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.5),
                 ),
                 const SizedBox(height: 2),
-                const Text(
-                  'Version 0.1.5 · Release Build',
-                  style: TextStyle(fontSize: 12, color: SlipTheme.steel),
+                Text(
+                  'Version ${AppUpdateService.currentVersion} · Release Build',
+                  style: const TextStyle(fontSize: 12, color: SlipTheme.steel),
                 ),
               ],
             ),
@@ -1234,6 +1362,343 @@ class _SubSettingToggle extends StatelessWidget {
           onChanged: onChanged,
           activeColor: SlipTheme.carbon,
         ),
+      ],
+    );
+  }
+}
+
+// ==========================================
+// GITHUB IN-APP UPDATE MODALS & DIALOGS
+// ==========================================
+
+class _CheckingUpdatesDialog extends StatelessWidget {
+  const _CheckingUpdatesDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: SlipTheme.canvas,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      content: const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2.2, color: SlipTheme.carbon),
+            ),
+            SizedBox(width: 18),
+            Expanded(
+              child: Text(
+                'Checking GitHub Releases for updates...',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: SlipTheme.carbon),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _UpdateAvailableModal extends StatelessWidget {
+  final AppReleaseInfo info;
+  final VoidCallback onStartUpdate;
+
+  const _UpdateAvailableModal({
+    required this.info,
+    required this.onStartUpdate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: SlipTheme.canvas,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+      actionsPadding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: SlipTheme.carbon.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.system_update_rounded, size: 20, color: SlipTheme.carbon),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'UPDATE AVAILABLE',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: SlipTheme.steel,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  info.tagName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: SlipTheme.carbon,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Metadata strip
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: SlipTheme.hairline.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    info.sizeDisplay,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: SlipTheme.carbon),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  DateFormat.yMMMd().format(info.publishedAt),
+                  style: const TextStyle(fontSize: 11.5, color: SlipTheme.steel),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+
+            const Text(
+              'WHAT\'S NEW IN THIS RELEASE',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: SlipTheme.steel, letterSpacing: 0.5),
+            ),
+            const SizedBox(height: 6),
+
+            // Scrollable Changelog box
+            Container(
+              constraints: const BoxConstraints(maxHeight: 180),
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF9F9FB),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: SlipTheme.hairline, width: 0.8),
+              ),
+              child: SingleChildScrollView(
+                child: SelectableText(
+                  info.body.trim().isNotEmpty ? info.body.trim() : 'Performance improvements and bug fixes.',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: SlipTheme.carbon,
+                    height: 1.45,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Zero Data Loss Guarantee Callout
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: SlipTheme.clearedGreen.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: SlipTheme.clearedGreen.withOpacity(0.3), width: 0.8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.shield_outlined, size: 16, color: SlipTheme.clearedGreen),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Zero Data Loss: Your local tasks, blunders, and settings will remain completely safe.',
+                      style: TextStyle(fontSize: 11, color: SlipTheme.clearedGreen, fontWeight: FontWeight.w600, height: 1.3),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text(
+            'LATER',
+            style: TextStyle(color: SlipTheme.steel, fontWeight: FontWeight.w700, fontSize: 12),
+          ),
+        ),
+        ElevatedButton.icon(
+          onPressed: onStartUpdate,
+          icon: const Icon(Icons.download_rounded, size: 16),
+          label: const Text(
+            'UPDATE NOW',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, letterSpacing: 0.3),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: SlipTheme.carbon,
+            foregroundColor: SlipTheme.canvas,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DownloadProgressModal extends StatefulWidget {
+  final AppReleaseInfo info;
+
+  const _DownloadProgressModal({required this.info});
+
+  @override
+  State<_DownloadProgressModal> createState() => _DownloadProgressModalState();
+}
+
+class _DownloadProgressModalState extends State<_DownloadProgressModal> {
+  StreamSubscription<AppUpdateProgress>? _sub;
+  AppUpdateProgress _progress = const AppUpdateProgress(
+    progress: 0.0,
+    receivedBytes: 0,
+    totalBytes: 0,
+  );
+  String _statusMessage = 'Connecting to GitHub...';
+  bool _isError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startDownload();
+  }
+
+  void _startDownload() {
+    _sub = AppUpdateService().downloadAndTrack(
+      widget.info.apkDownloadUrl,
+      onComplete: (filePath) async {
+        if (!mounted) return;
+        setState(() {
+          _statusMessage = 'Opening Android Package Installer...';
+        });
+
+        await Future.delayed(const Duration(milliseconds: 300));
+        await AppUpdateService().installApk(filePath);
+
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+    ).listen(
+      (progress) {
+        if (!mounted) return;
+        setState(() {
+          _progress = progress;
+          if (progress.error != null) {
+            _isError = true;
+            _statusMessage = 'Download error: ${progress.error}';
+          } else if (progress.isCompleted) {
+            _statusMessage = 'Download complete. Launching installer...';
+          } else {
+            _statusMessage = 'Downloading update...';
+          }
+        });
+      },
+      onError: (err) {
+        if (!mounted) return;
+        setState(() {
+          _isError = true;
+          _statusMessage = 'Download failed: $err';
+        });
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: SlipTheme.canvas,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text(
+        'DOWNLOADING UPDATE',
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: SlipTheme.steel, letterSpacing: 0.5),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _statusMessage,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: _isError ? SlipTheme.trapRed : SlipTheme.carbon,
+            ),
+          ),
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: _progress.totalBytes > 0 ? _progress.progress : null,
+              backgroundColor: SlipTheme.hairline.withOpacity(0.5),
+              valueColor: AlwaysStoppedAnimation<Color>(_isError ? SlipTheme.trapRed : SlipTheme.carbon),
+              minHeight: 8,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${_progress.percentInt}%',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: SlipTheme.carbon),
+              ),
+              Text(
+                '${_progress.receivedDisplay} / ${_progress.totalDisplay}',
+                style: const TextStyle(fontSize: 11.5, color: SlipTheme.steel),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Keep Slip open while downloading.',
+            style: TextStyle(fontSize: 11, color: SlipTheme.steelLight),
+          ),
+        ],
+      ),
+      actions: [
+        if (_isError)
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('DISMISS', style: TextStyle(color: SlipTheme.carbon, fontWeight: FontWeight.w700)),
+          ),
       ],
     );
   }
