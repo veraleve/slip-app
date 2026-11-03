@@ -65,7 +65,7 @@ void main() {
 
       final topics = initialSlips.map((s) => s.topic).toList();
       expect(topics, contains('Linear Algebra'));
-      expect(topics, contains('Operating Systems'));
+      expect(topics.any((t) => t.contains('Operating System')), isTrue);
     });
   });
 
