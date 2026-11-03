@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase/supabase.dart';
@@ -228,7 +229,7 @@ class SupabaseService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userSlips = slips.where((s) => s.authorId != null && s.authorId == _currentUserId).toList();
-      final rawList = userSlips.map((s) => jsonEncode(s.toJson())).toList();
+      final List<String> rawList = userSlips.map((s) => jsonEncode(s.toJson())).toList();
       await prefs.setStringList('slip_local_user_slips', rawList);
     } catch (_) {}
   }

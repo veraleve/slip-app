@@ -4,12 +4,15 @@ import '../theme/slip_theme.dart';
 class AudioWaveformStrip extends StatefulWidget {
   final int totalSeconds;
   final String? studentTranscript;
+  final bool? isPlaying;
 
   const AudioWaveformStrip({
     super.key,
-    required this.totalSeconds,
+    int? totalSeconds,
+    int? durationSeconds,
     this.studentTranscript,
-  });
+    this.isPlaying,
+  }) : totalSeconds = durationSeconds ?? totalSeconds ?? 0;
 
   @override
   State<AudioWaveformStrip> createState() => _AudioWaveformStripState();
