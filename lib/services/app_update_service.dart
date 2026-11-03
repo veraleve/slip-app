@@ -106,7 +106,7 @@ class AppUpdateProgress {
 }
 
 class AppUpdateService {
-  static const String currentVersion = '0.1.8';
+  static const String currentVersion = '0.1.9';
   static const String githubRepo = 'veraleve/slip-app';
   static const String releaseApiUrl = 'https://api.github.com/repos/$githubRepo/releases/latest';
 

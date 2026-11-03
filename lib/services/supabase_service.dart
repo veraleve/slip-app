@@ -168,55 +168,53 @@ class SupabaseService {
     required String password,
   }) async {
     final cleanUsername = username.trim();
-    if (cleanUsername.isEmpty || password.isEmpty) return false;
+    final cleanPassword = password.trim();
+    if (cleanUsername.isEmpty || cleanPassword.isEmpty) return false;
 
-    if (_client == null) {
-      await _persistSession(cleanUsername, 'user_${cleanUsername.toLowerCase()}', _targetExams);
-      return true;
-    }
-
-    try {
-      final email = _toInternalEmail(cleanUsername);
-      final res = await _client!.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
-
-      if (res.user != null) {
-        // Fetch user profile to restore their chosen exams
-        List<String> userExams = _targetExams;
-        try {
-          final pRes = await _client!.from('profiles').select().eq('id', res.user!.id).limit(1);
-          final pList = pRes as List;
-          if (pList.isNotEmpty) {
-            final pObj = Profile.fromJson(pList.first as Map<String, dynamic>);
-            userExams = pObj.targetExams;
-          }
-        } catch (_) {}
-
-        await _persistSession(cleanUsername, res.user!.id, userExams);
-        return true;
-      }
-    } catch (_) {
-      // Graceful fallback for local or pre-created user
+    if (_client != null) {
       try {
         final profileRes = await _client!
             .from('profiles')
             .select()
-            .eq('handle', cleanUsername)
+            .ilike('handle', cleanUsername)
             .limit(1);
         final list = profileRes as List;
         if (list.isNotEmpty) {
           final p = list.first as Map<String, dynamic>;
+          final storedPass = p['password_hash'] as String?;
+          if (storedPass != null && storedPass.isNotEmpty && storedPass != cleanPassword) {
+            // Password mismatch
+            return false;
+          }
+          // If password_hash wasn't set, set it now
+          if (storedPass == null || storedPass.isEmpty) {
+            try {
+              await _client!.from('profiles').update({'password_hash': cleanPassword}).eq('id', p['id']);
+            } catch (_) {}
+          }
+
           final pObj = Profile.fromJson(p);
-          await _persistSession(cleanUsername, pObj.id, pObj.targetExams);
+          await _persistSession(pObj.handle, pObj.id, pObj.targetExams);
           return true;
+        } else {
+          // No such profile in Supabase
+          return false;
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Sign in check warning: $e');
+      }
     }
 
-    await _persistSession(cleanUsername, 'user_${cleanUsername.toLowerCase()}', _targetExams);
-    return true;
+    // Local cached session fallback if credentials match
+    if (_savedUsername != null && _savedUsername!.toLowerCase() == cleanUsername.toLowerCase()) {
+      if (_savedPassword != null && _savedPassword!.isNotEmpty && _savedPassword != cleanPassword) {
+        return false;
+      }
+      await _persistSession(cleanUsername, _currentUserId ?? generateUuid(), _targetExams);
+      return true;
+    }
+
+    return false;
   }
 
   Future<bool> signUpWithUsername({
@@ -225,34 +223,34 @@ class SupabaseService {
     List<String> targetExams = const [GateSyllabus.gateCS],
   }) async {
     final cleanUsername = username.trim();
-    if (cleanUsername.isEmpty || password.isEmpty) return false;
+    final cleanPassword = password.trim();
+    if (cleanUsername.isEmpty || cleanPassword.isEmpty) return false;
 
     final resolvedExams = targetExams.isNotEmpty ? targetExams : [GateSyllabus.gateCS];
-    String uid = 'user_${cleanUsername.toLowerCase()}_${Random().nextInt(9999)}';
+    final uid = generateUuid();
 
     if (_client != null) {
       try {
-        final email = _toInternalEmail(cleanUsername);
-        final res = await _client!.auth.signUp(
-          email: email,
-          password: password,
-          data: {'handle': cleanUsername},
-        );
-        if (res.user != null) {
-          uid = res.user!.id;
+        final existing = await _client!
+            .from('profiles')
+            .select()
+            .ilike('handle', cleanUsername)
+            .limit(1);
+        if ((existing as List).isNotEmpty) {
+          return false; // Handle already registered
         }
-      } catch (_) {
-        // Direct profile fallback
-      }
 
-      try {
-        await _client!.from('profiles').upsert({
+        await _client!.from('profiles').insert({
           'id': uid,
           'handle': cleanUsername,
+          'password_hash': cleanPassword,
           'target_exams': resolvedExams,
           'target_exam': resolvedExams.first,
+          'avatar_glyph': cleanUsername.substring(0, 1).toUpperCase(),
         });
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Sign up error: $e');
+      }
     }
 
     await _persistSession(cleanUsername, uid, resolvedExams);
@@ -472,6 +470,21 @@ class SupabaseService {
           sortedForCache.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           await saveCachedFeed(sortedForCache);
         }
+
+        // Also fetch this signed-in user's slips from Supabase so reinstalling never loses them!
+        if (_currentUsername != null && _currentUsername!.isNotEmpty) {
+          try {
+            final userPosts = await _client!
+                .from('slips')
+                .select()
+                .ilike('author_handle', _currentUsername!)
+                .order('created_at', ascending: false);
+            for (final item in (userPosts as List)) {
+              final s = Slip.fromJson(item as Map<String, dynamic>);
+              combinedMap[s.id] = s.copyWith(hasKept: savedIds.contains(s.id));
+            }
+          } catch (_) {}
+        }
       } catch (_) {
         // Offline or connection failure: gracefully proceed with cached data
       }
@@ -486,6 +499,8 @@ class SupabaseService {
       final normSet = allowedPapers.map(GateSyllabus.normalizeExam).toSet();
       result = result.where((s) {
         if (s.examTag == null || s.examTag!.isEmpty) return true;
+        // Always preserve General doubts across all paper filters
+        if (s.examTag == 'General' || s.topic == 'General') return true;
         return normSet.contains(GateSyllabus.normalizeExam(s.examTag));
       }).toList();
     }
@@ -595,7 +610,8 @@ class SupabaseService {
         'created_at': slip.createdAt.toUtc().toIso8601String(),
       });
       return true;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Submit slip to Supabase error: $e');
       return false;
     }
   }
@@ -643,7 +659,8 @@ class SupabaseService {
         'audio_duration_seconds': slip.audioDurationSeconds,
       }).eq('id', slip.id);
       return true;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Submit slip to Supabase error: $e');
       return false;
     }
   }
@@ -658,7 +675,8 @@ class SupabaseService {
     try {
       await _client!.from('slips').delete().eq('id', slipId);
       return true;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Submit slip to Supabase error: $e');
       return false;
     }
   }

@@ -21,7 +21,7 @@ class SlipProvider extends ChangeNotifier {
   List<Slip> get slips {
     var result = _slips;
     if (_selectedExamFilter != 'All') {
-      result = result.where((s) => s.examTag == _selectedExamFilter).toList();
+      result = result.where((s) => s.examTag == _selectedExamFilter || s.examTag == 'General').toList();
     }
 
     if (_selectedPostTypeFilter != null) {
@@ -29,7 +29,11 @@ class SlipProvider extends ChangeNotifier {
     }
 
     if (_selectedSubjectFilter != 'All') {
-      result = result.where((s) => s.topic == _selectedSubjectFilter).toList();
+      if (_selectedSubjectFilter == 'General') {
+        result = result.where((s) => s.examTag == 'General' || s.topic == 'General' || s.subtopic == 'General').toList();
+      } else {
+        result = result.where((s) => s.topic == _selectedSubjectFilter).toList();
+      }
     }
 
     if (_selectedSubtopicFilter != 'All Topics') {
@@ -37,7 +41,11 @@ class SlipProvider extends ChangeNotifier {
     }
 
     if (_selectedTopicFilter != 'All' && _selectedSubjectFilter == 'All') {
-      result = result.where((s) => s.topic == _selectedTopicFilter).toList();
+      if (_selectedTopicFilter == 'General') {
+        result = result.where((s) => s.examTag == 'General' || s.topic == 'General' || s.subtopic == 'General').toList();
+      } else {
+        result = result.where((s) => s.topic == _selectedTopicFilter).toList();
+      }
     }
 
     result.sort((a, b) => b.createdAt.compareTo(a.createdAt));

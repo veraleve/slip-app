@@ -43,6 +43,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _checkPermissions();
+    _loadNotificationSettings();
+  }
+
+  Future<void> _loadNotificationSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hour = prefs.getInt('slip_reminder_hour') ?? 8;
+    final min = prefs.getInt('slip_reminder_minute') ?? 0;
+    _reminderTime = TimeOfDay(hour: hour, minute: min);
+    _dailyNotificationEnabled = prefs.getBool('slip_notif_daily') ?? true;
+    _peerMeshAlertsEnabled = prefs.getBool('slip_notif_peer') ?? true;
+    _commentAlertsEnabled = prefs.getBool('slip_notif_comment') ?? true;
+    if (mounted) setState(() {});
   }
 
   Future<void> _checkPermissions() async {
@@ -779,7 +791,7 @@ class _ExamPapersSettingsPageState extends State<_ExamPapersSettingsPage> {
 // SUB-PAGE 2: NOTIFICATIONS & ALERTS
 // ==========================================
 
-class _NotificationsSettingsPage extends StatelessWidget {
+class _NotificationsSettingsPage extends StatefulWidget {
   final bool dailyEnabled;
   final TimeOfDay reminderTime;
   final bool peerAlerts;
@@ -803,6 +815,25 @@ class _NotificationsSettingsPage extends StatelessWidget {
   });
 
   @override
+  State<_NotificationsSettingsPage> createState() => _NotificationsSettingsPageState();
+}
+
+class _NotificationsSettingsPageState extends State<_NotificationsSettingsPage> {
+  late bool _daily;
+  late bool _peer;
+  late bool _comment;
+  late TimeOfDay _time;
+
+  @override
+  void initState() {
+    super.initState();
+    _daily = widget.dailyEnabled;
+    _peer = widget.peerAlerts;
+    _comment = widget.commentAlerts;
+    _time = widget.reminderTime;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: SlipTheme.canvas,
@@ -819,78 +850,147 @@ class _NotificationsSettingsPage extends StatelessWidget {
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         children: [
+          // 1. Toggle 1: Daily Morning Inoculation
           _SubSettingToggle(
             title: 'DAILY MORNING INOCULATION',
             subtitle: 'Deliver 5 curated weak-spot blunders matching your syllabus every morning.',
-            value: dailyEnabled,
-            onChanged: onDailyToggle,
+            value: _daily,
+            onChanged: (val) {
+              setState(() => _daily = val);
+              widget.onDailyToggle(val);
+            },
           ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'DELIVERY TIME',
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: SlipTheme.steel),
-                  ),
-                  SizedBox(height: 2),
-                  Text('Scheduled device alarm time', style: TextStyle(fontSize: 11, color: SlipTheme.steel)),
-                ],
-              ),
-              OutlinedButton.icon(
-                onPressed: () async {
-                  final picked = await showTimePicker(
-                    context: context,
-                    initialTime: reminderTime,
-                  );
-                  if (picked != null) onTimePicked(picked);
-                },
-                icon: const Icon(Icons.access_time_rounded, size: 14),
-                label: Text(
-                  reminderTime.format(context),
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: SlipTheme.carbon,
-                  side: const BorderSide(color: SlipTheme.hairline, width: 0.8),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Divider(height: 1, color: SlipTheme.hairline),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+
+          // 2. Toggle 2: Peer Mesh Blunder Alerts
           _SubSettingToggle(
             title: 'PEER MESH BLUNDER ALERTS',
             subtitle: 'Get notified when a nearby peer shares a blunder in your active subjects.',
-            value: peerAlerts,
-            onChanged: onPeerToggle,
+            value: _peer,
+            onChanged: (val) {
+              setState(() => _peer = val);
+              widget.onPeerToggle(val);
+            },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+
+          // 3. Toggle 3: Comment & Discussion Alerts
           _SubSettingToggle(
             title: 'COMMENT & DISCUSSION ALERTS',
             subtitle: 'Receive notifications when peers comment or discuss your shared blunders.',
-            value: commentAlerts,
-            onChanged: onCommentToggle,
+            value: _comment,
+            onChanged: (val) {
+              setState(() => _comment = val);
+              widget.onCommentToggle(val);
+            },
           ),
+
+          // Slim Thread Line (User UX separation)
+          const SizedBox(height: 18),
+          const Divider(height: 1, thickness: 0.8, color: SlipTheme.hairline),
+          const SizedBox(height: 20),
+
+          // 4. Delivery Time Section in its own dedicated card
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: SlipTheme.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: SlipTheme.hairline, width: 0.8),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: SlipTheme.canvas,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: SlipTheme.hairline),
+                  ),
+                  child: const Icon(Icons.access_time_filled_rounded, size: 20, color: SlipTheme.carbon),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'DELIVERY TIME',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                          color: SlipTheme.steel,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        _time.format(context),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: SlipTheme.carbon,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Scheduled morning alarm delivery',
+                        style: TextStyle(fontSize: 11, color: SlipTheme.steel),
+                      ),
+                    ],
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: _time,
+                    );
+                    if (picked != null) {
+                      setState(() => _time = picked);
+                      widget.onTimePicked(picked);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Delivery time updated to ${picked.format(context)}.'),
+                            backgroundColor: SlipTheme.carbon,
+                            duration: const Duration(seconds: 2),
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: SlipTheme.carbon,
+                    foregroundColor: SlipTheme.canvas,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  ),
+                  child: const Text('CHANGE', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11.5)),
+                ),
+              ],
+            ),
+          ),
+
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: onTestAlert,
+            child: OutlinedButton.icon(
+              onPressed: widget.onTestAlert,
               icon: const Icon(Icons.notifications_active_outlined, size: 16),
-              label: const Text('DISPATCH TEST NOTIFICATION', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: SlipTheme.carbon,
-                foregroundColor: SlipTheme.canvas,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+              label: const Text('DISPATCH TEST NOTIFICATION', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: SlipTheme.carbon,
+                side: const BorderSide(color: SlipTheme.hairline, width: 0.8),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
             ),
           ),
@@ -1518,25 +1618,21 @@ class _UpdateAvailableModal extends StatelessWidget {
             ),
             const SizedBox(height: 6),
 
-            // Scrollable Changelog box
+            // Scrollable Changelog box with Markdown rendering
             Container(
-              constraints: const BoxConstraints(maxHeight: 180),
+              constraints: const BoxConstraints(maxHeight: 200),
               width: double.infinity,
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFFF9F9FB),
-                borderRadius: BorderRadius.circular(12),
+                color: SlipTheme.canvas,
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: SlipTheme.hairline, width: 0.8),
               ),
               child: SingleChildScrollView(
-                child: SelectableText(
-                  info.body.trim().isNotEmpty ? info.body.trim() : 'Performance improvements and bug fixes.',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: SlipTheme.carbon,
-                    height: 1.45,
-                    fontFamily: 'monospace',
-                  ),
+                child: _MarkdownChangelogView(
+                  markdown: info.body.trim().isNotEmpty
+                      ? info.body.trim()
+                      : 'Performance improvements and bug fixes.',
                 ),
               ),
             ),
@@ -1591,6 +1687,135 @@ class _UpdateAvailableModal extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _MarkdownChangelogView extends StatelessWidget {
+  final String markdown;
+
+  const _MarkdownChangelogView({required this.markdown});
+
+  @override
+  Widget build(BuildContext context) {
+    final lines = markdown.split('\n');
+    final widgets = <Widget>[];
+
+    for (final rawLine in lines) {
+      final line = rawLine.trim();
+      if (line.isEmpty) {
+        widgets.add(const SizedBox(height: 6));
+        continue;
+      }
+
+      if (line.startsWith('## ')) {
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 4),
+          child: Text(
+            line.substring(3).trim(),
+            style: const TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w900,
+              color: SlipTheme.carbon,
+              letterSpacing: -0.2,
+            ),
+          ),
+        ));
+      } else if (line.startsWith('### ')) {
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 4),
+          child: Text(
+            line.substring(4).trim(),
+            style: const TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w800,
+              color: SlipTheme.carbon,
+              letterSpacing: -0.1,
+            ),
+          ),
+        ));
+      } else if (line.startsWith('- ') || line.startsWith('* ')) {
+        final bulletText = line.substring(2).trim();
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 6, right: 8),
+                width: 4.5,
+                height: 4.5,
+                decoration: const BoxDecoration(
+                  color: SlipTheme.carbon,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              Expanded(
+                child: _buildFormattedText(bulletText),
+              ),
+            ],
+          ),
+        ));
+      } else {
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: _buildFormattedText(line),
+        ));
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: widgets,
+    );
+  }
+
+  Widget _buildFormattedText(String text) {
+    final spans = <TextSpan>[];
+    final regex = RegExp(r'(\*\*[^*]+\*\*|`[^`]+`)');
+    int last = 0;
+
+    for (final match in regex.allMatches(text)) {
+      if (match.start > last) {
+        spans.add(TextSpan(
+          text: text.substring(last, match.start),
+          style: const TextStyle(fontSize: 12, color: SlipTheme.carbon, height: 1.4),
+        ));
+      }
+
+      final matched = match.group(0)!;
+      if (matched.startsWith('**') && matched.endsWith('**')) {
+        spans.add(TextSpan(
+          text: matched.substring(2, matched.length - 2),
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            color: SlipTheme.carbon,
+            height: 1.4,
+          ),
+        ));
+      } else if (matched.startsWith('`') && matched.endsWith('`')) {
+        spans.add(TextSpan(
+          text: matched.substring(1, matched.length - 1),
+          style: const TextStyle(
+            fontSize: 11,
+            fontFamily: 'monospace',
+            fontWeight: FontWeight.w700,
+            color: SlipTheme.carbon,
+            backgroundColor: Color(0xFFEEEEEE),
+          ),
+        ));
+      }
+      last = match.end;
+    }
+
+    if (last < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(last),
+        style: const TextStyle(fontSize: 12, color: SlipTheme.carbon, height: 1.4),
+      ));
+    }
+
+    return RichText(text: TextSpan(children: spans));
   }
 }
 

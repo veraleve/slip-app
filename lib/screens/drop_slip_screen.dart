@@ -66,10 +66,17 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
   void _onExamChanged(String exam) {
     setState(() {
       _selectedExam = exam;
-      final subjects = GateSyllabus.getSubjectsForExam(exam);
-      _selectedSubject = subjects.first;
-      final topics = GateSyllabus.getSubtopics(exam, _selectedSubject);
-      _selectedSubtopic = topics.isNotEmpty ? topics.first : 'General';
+      if (exam == 'General') {
+        _isGeneralDoubt = true;
+        _selectedSubject = 'General';
+        _selectedSubtopic = 'General';
+      } else {
+        _isGeneralDoubt = false;
+        final subjects = GateSyllabus.getSubjectsForExam(exam);
+        _selectedSubject = subjects.first;
+        final topics = GateSyllabus.getSubtopics(exam, _selectedSubject);
+        _selectedSubtopic = topics.isNotEmpty ? topics.first : 'General';
+      }
     });
   }
 
@@ -464,9 +471,9 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
               const Divider(color: SlipTheme.hairline, height: 1),
               const SizedBox(height: 18),
 
-              // 1. Cascading Selector 1: Exam Paper
+              // 1. Cascading Selector 1: Exam Paper Dropdown
               Text(
-                'EXAM PAPER',
+                'TARGET EXAM PAPER',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: SlipTheme.steel,
@@ -474,29 +481,39 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                     ),
               ),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: GateSyllabus.supportedExams.map((exam) {
-                  final isSelected = exam == _selectedExam;
-                  return ChoiceChip(
-                    label: Text(
-                      exam,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                        color: isSelected ? SlipTheme.canvas : SlipTheme.carbon,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                decoration: BoxDecoration(
+                  border: Border.all(color: SlipTheme.hairline, width: 0.8),
+                  borderRadius: BorderRadius.circular(16),
+                  color: SlipTheme.surface,
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: (_selectedExam == 'General' || _isGeneralDoubt) ? 'General' : _selectedExam,
+                    isExpanded: true,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: SlipTheme.carbon,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                    items: [
+                      ...GateSyllabus.supportedExams.map((exam) {
+                        return DropdownMenuItem(
+                          value: exam,
+                          child: Text(exam, overflow: TextOverflow.ellipsis),
+                        );
+                      }),
+                      const DropdownMenuItem(
+                        value: 'General',
+                        child: Text('General Doubt (No Subject / Any Topic)', overflow: TextOverflow.ellipsis),
                       ),
-                    ),
-                    selected: isSelected,
-                    selectedColor: SlipTheme.carbon,
-                    backgroundColor: SlipTheme.surface,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: const BorderSide(color: SlipTheme.hairline, width: 0.8),
-                    ),
-                    onSelected: (_) => _onExamChanged(exam),
-                  );
-                }).toList(),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) _onExamChanged(val);
+                    },
+                  ),
+                ),
               ),
 
               const SizedBox(height: 18),

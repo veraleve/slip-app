@@ -67,7 +67,8 @@ jobs:
           body: |
             ## Slip — Ask doubts. Learn from mistakes. Master together.
 
-            ### What's New in v0.1.8:
+            ### What's New in v0.1.9:
+            - Permanent Release Keystore: Integrated permanent cryptographic signing key into the build pipeline. All future in-app updates will install seamlessly in-place just like the Google Play Store with zero package signature conflicts and zero data loss.
             - Desktop Connect Web Bridge: Built-in local HTTP server (port 8080) to connect your laptop over Wi-Fi/Hotspot. Log test blunders and paste question screenshots with Ctrl+V with zero cloud fees.
             - In-Text Clickable Links: Auto-detects http:// and https:// URLs across doubts, blunders, and comments, opening them natively in your browser.
             - General Doubt Quick Chip: Ask doubts without mandatory syllabus subject tagging; simplifies doubt input form.

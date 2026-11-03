@@ -58,6 +58,12 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _enterViaMesh() async {
+    final password = _passwordController.text.trim();
+    if (password.isEmpty) {
+      setState(() => _errorMessage = 'PLEASE ENTER A PASSWORD TO SECURE YOUR PROFILE.');
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -80,7 +86,7 @@ class _AuthScreenState extends State<AuthScreen> {
         true,
         rememberDevice: _rememberDevice,
         username: handle ?? service.currentUsername ?? 'peer',
-        password: '',
+        password: password,
       );
       widget.onAuthenticated();
     } else {
@@ -90,11 +96,25 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _handleAuth() async {
     final username = _usernameController.text.trim();
-    final password = _passwordController.text;
+    final password = _passwordController.text.trim();
 
-    if (username.isEmpty || password.isEmpty) {
+    if (username.isEmpty) {
       setState(() {
-        _errorMessage = 'PLEASE ENTER USERNAME AND PASSWORD.';
+        _errorMessage = 'PLEASE ENTER A USERNAME.';
+      });
+      return;
+    }
+
+    if (password.isEmpty) {
+      setState(() {
+        _errorMessage = 'PLEASE ENTER A PASSWORD TO SIGN IN OR CREATE ACCOUNT.';
+      });
+      return;
+    }
+
+    if (password.length < 4) {
+      setState(() {
+        _errorMessage = 'PASSWORD MUST BE AT LEAST 4 CHARACTERS.';
       });
       return;
     }
@@ -132,7 +152,9 @@ class _AuthScreenState extends State<AuthScreen> {
       widget.onAuthenticated();
     } else {
       setState(() {
-        _errorMessage = 'COULD NOT SIGN IN. TRY ENTERING VIA MESH.';
+        _errorMessage = _isSignUp
+            ? 'USERNAME ALREADY REGISTERED. PLEASE SIGN IN.'
+            : 'INVALID USERNAME OR PASSWORD.';
       });
     }
   }
