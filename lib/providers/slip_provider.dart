@@ -8,16 +8,25 @@ class SlipProvider extends ChangeNotifier {
   List<Slip> _slips = [];
   bool _isLoading = false;
   int _activeTabIndex = 0;
+  String _selectedExamFilter = 'All';
   String _selectedTopicFilter = 'All';
 
   List<Slip> get slips {
-    if (_selectedTopicFilter == 'All') return _slips;
-    return _slips.where((s) => s.topic == _selectedTopicFilter).toList();
+    var result = _slips;
+    if (_selectedExamFilter != 'All') {
+      result = result.where((s) => s.examTag == _selectedExamFilter).toList();
+    }
+    if (_selectedTopicFilter != 'All') {
+      result = result.where((s) => s.topic == _selectedTopicFilter).toList();
+    }
+    return result;
   }
 
   bool get isLoading => _isLoading;
   int get activeTabIndex => _activeTabIndex;
+  String get selectedExamFilter => _selectedExamFilter;
   String get selectedTopicFilter => _selectedTopicFilter;
+  List<String> get userExams => _service.targetExams;
 
   // Counts for profile
   int get sharedCount => _slips.where((s) => s.authorId != null).length;
@@ -27,7 +36,8 @@ class SlipProvider extends ChangeNotifier {
   Future<void> init() async {
     _isLoading = true;
     notifyListeners();
-    _slips = await _service.fetchStream();
+    // Strictly isolate to the user's registered papers
+    _slips = await _service.fetchStream(userPapers: _service.targetExams);
     _isLoading = false;
     notifyListeners();
   }
@@ -37,6 +47,12 @@ class SlipProvider extends ChangeNotifier {
       _activeTabIndex = index;
       notifyListeners();
     }
+  }
+
+  void setExamFilter(String exam) {
+    _selectedExamFilter = exam;
+    _selectedTopicFilter = 'All'; // Reset topic filter on exam switch
+    notifyListeners();
   }
 
   void setTopicFilter(String topic) {
@@ -121,18 +137,22 @@ class SlipProvider extends ChangeNotifier {
 
   // 5. Submit new slip
   Future<bool> dropSlip({
+    required String examTag,
     required String topic,
     required String subtopic,
     required String trapStatement,
     required String fixStatement,
+    List<String> imageUris = const [],
     int audioDurationSeconds = 0,
   }) async {
     final newSlip = Slip(
       id: 'slip-${DateTime.now().millisecondsSinceEpoch}',
+      examTag: examTag,
       topic: topic,
       subtopic: subtopic,
       trapStatement: trapStatement,
       fixStatement: fixStatement,
+      imageUris: imageUris,
       audioDurationSeconds: audioDurationSeconds,
       createdAt: DateTime.now(),
       authorId: _service.currentUserId ?? 'current_user',

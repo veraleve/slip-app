@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../constants/app_constants.dart';
+import '../services/native_device_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/slip_theme.dart';
 
@@ -15,139 +15,116 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _meshEnabled = true;
   bool _offlineCacheEnabled = true;
-  String _selectedExam = AppConstants.supportedExams.first;
+  bool _dailyNotificationEnabled = true;
 
   @override
   Widget build(BuildContext context) {
+    final service = SupabaseService();
+    final userExams = service.targetExams;
+
     return Scaffold(
       backgroundColor: SlipTheme.canvas,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header
               Text(
-                'SYSTEM SETTINGS',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      fontSize: 16,
+                'Settings',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
+                      color: SlipTheme.carbon,
+                      letterSpacing: -0.5,
                     ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 4),
               Text(
-                'PREFERENCES // NETWORK & TELEMETRY CONTROLS',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                'Offline mesh, notifications, and exam preferences.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: SlipTheme.steel,
                     ),
               ),
               const SizedBox(height: 24),
-              const Divider(),
+              const Divider(color: SlipTheme.hairline, height: 1),
+              const SizedBox(height: 16),
 
               // 1. Campus Offline BLE Mesh
               _SettingToggle(
-                title: 'CAMPUS OFFLINE BLE MESH',
+                title: 'CAMPUS BLE MESH',
                 subtitle:
-                    'Share and receive mistake slips over Bluetooth Low Energy with peers in the same library or hostel without internet.',
+                    'Broadcast and receive mistake slips directly with nearby peers in your college library or hostel without internet.',
                 value: _meshEnabled,
                 onChanged: (val) {
                   setState(() => _meshEnabled = val);
                 },
               ),
               const SizedBox(height: 16),
-              const Divider(),
+              const Divider(color: SlipTheme.hairline, height: 1),
+              const SizedBox(height: 16),
 
-              // 2. Offline Cache for Test Centers
+              // 2. Daily Mistake Notifications
               _SettingToggle(
-                title: 'AUTO-CACHE SLIPS FOR OFFLINE STUDY',
+                title: 'DAILY INOCULATION ALERTS',
                 subtitle:
-                    'Keep top 100 high-yield exam traps cached for quick revision right before entering the test hall.',
+                    'Receive a focused morning notification with high-yield conceptual traps for your exam syllabus.',
+                value: _dailyNotificationEnabled,
+                onChanged: (val) async {
+                  setState(() => _dailyNotificationEnabled = val);
+                  if (val) {
+                    await NativeDeviceService.requestPermissions();
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              const Divider(color: SlipTheme.hairline, height: 1),
+              const SizedBox(height: 16),
+
+              // 3. Offline Cache
+              _SettingToggle(
+                title: 'AUTO-CACHE FOR EXAM DAY',
+                subtitle:
+                    'Persist your saved and high-yield mistake slips locally on device for quick offline revision at the exam center.',
                 value: _offlineCacheEnabled,
                 onChanged: (val) {
                   setState(() => _offlineCacheEnabled = val);
                 },
               ),
-              const SizedBox(height: 16),
-              const Divider(),
+              const SizedBox(height: 20),
+              const Divider(color: SlipTheme.hairline, height: 1),
+              const SizedBox(height: 20),
 
-              // 3. Target Exam Selector
+              // 4. Current Target Papers
               Text(
-                'TARGET EXAM STREAM',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                'REGISTERED EXAM PAPERS',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Filters all mistake recommendations to your curriculum',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontSize: 12,
+                      color: SlipTheme.steel,
+                      letterSpacing: 0.6,
                     ),
               ),
               const SizedBox(height: 8),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
                   color: SlipTheme.surface,
+                  borderRadius: BorderRadius.circular(3),
                   border: Border.all(color: SlipTheme.hairline, width: 0.8),
-                  borderRadius: BorderRadius.circular(2),
                 ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedExam,
-                    isExpanded: true,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: SlipTheme.carbon,
-                          fontWeight: FontWeight.w600,
-                        ),
-                    items: AppConstants.supportedExams.map((exam) {
-                      return DropdownMenuItem(
-                        value: exam,
-                        child: Text(exam),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() => _selectedExam = val);
-                      }
-                    },
-                  ),
+                child: Text(
+                  userExams.join('  •  '),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: SlipTheme.carbon,
+                      ),
                 ),
               ),
-              const SizedBox(height: 24),
-              const Divider(),
 
-              // 4. Cloud Infrastructure Status
-              Text(
-                'INFRASTRUCTURE ENDPOINTS',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              _EndpointRow(
-                label: 'SUPABASE REGION',
-                value: 'ap-south-1 (Mumbai)',
-                status: 'ACTIVE',
-              ),
-              const SizedBox(height: 6),
-              _EndpointRow(
-                label: 'KAGGLE ENGINE',
-                value: 'Gemma-2 CPU Batch (12h Cycle)',
-                status: 'ONLINE',
-              ),
-              const SizedBox(height: 6),
-              _EndpointRow(
-                label: 'NOSTR RELAYS',
-                value: 'wss://relay.damus.io',
-                status: 'CONNECTED',
-              ),
-              const SizedBox(height: 28),
-              const Divider(),
+              const SizedBox(height: 32),
 
-              // 5. Sign Out / Reset
+              // 5. Sign Out
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
@@ -159,27 +136,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     foregroundColor: SlipTheme.trapRed,
                     side: const BorderSide(color: SlipTheme.trapRed, width: 0.8),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(3),
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   child: Text(
-                    'DISCONNECT SESSION & SIGN OUT',
+                    'SIGN OUT / RESET SESSION',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: SlipTheme.trapRed,
                           fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
                         ),
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
 
+              const SizedBox(height: 24),
               Center(
                 child: Text(
-                  'Slip v1.0.0 · Open Source (github.com/veraleve/slip-app)',
+                  'Slip v1.0.0 · Open Source Peer Inoculation Ecosystem',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: SlipTheme.steelLight,
-                        fontSize: 9,
+                        color: SlipTheme.steel,
+                        fontSize: 9.5,
                       ),
                 ),
               ),
@@ -216,15 +194,18 @@ class _SettingToggle extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.w700,
+                      color: SlipTheme.carbon,
+                      letterSpacing: 0.5,
                     ),
               ),
               const SizedBox(height: 4),
               Text(
                 subtitle,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontSize: 12,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: SlipTheme.steel,
+                      height: 1.35,
                     ),
               ),
             ],
@@ -235,61 +216,6 @@ class _SettingToggle extends StatelessWidget {
           value: value,
           onChanged: onChanged,
           activeColor: SlipTheme.carbon,
-        ),
-      ],
-    );
-  }
-}
-
-class _EndpointRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final String status;
-
-  const _EndpointRow({
-    required this.label,
-    required this.value,
-    required this.status,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: SlipTheme.steel,
-                fontSize: 9.5,
-              ),
-        ),
-        Row(
-          children: [
-            Text(
-              value,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 9.5,
-                  ),
-            ),
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-              decoration: BoxDecoration(
-                color: SlipTheme.clearedGreen.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(2),
-              ),
-              child: Text(
-                status,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: SlipTheme.clearedGreen,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 8,
-                    ),
-              ),
-            ),
-          ],
         ),
       ],
     );

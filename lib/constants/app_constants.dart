@@ -1,3 +1,5 @@
+import 'gate_syllabus.dart';
+
 class AppConstants {
   static const String appName = 'SLIP';
   static const String appVersion = 'v1.0.0';
@@ -8,25 +10,10 @@ class AppConstants {
   static const String supabaseAnonKey =
       'sb_publishable_VXnufLFzFqjaLkNP_u2lbg_kYr3oTfi';
 
-  // Exams
-  static const List<String> supportedExams = [
-    'GATE CS 2027',
-    'GATE DA 2027',
-    'GATE ECE 2027',
-    'GATE EE 2027',
-  ];
+  // Exams (All 4 GATE Branches)
+  static const List<String> supportedExams = GateSyllabus.supportedExams;
 
-  // Topics for GATE CS
-  static const List<String> gateTopics = [
-    'Linear Algebra',
-    'Calculus & Probability',
-    'Discrete Mathematics',
-    'Data Structures & Algorithms',
-    'Theory of Computation',
-    'Compiler Design',
-    'Operating Systems',
-    'Database Management Systems',
-    'Computer Networks',
-    'Computer Organization & Architecture',
-  ];
+  // Default Topics
+  static List<String> get defaultTopics =>
+      GateSyllabus.getSubjectsForExam(GateSyllabus.gateCS);
 }

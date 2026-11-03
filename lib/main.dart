@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'screens/auth_screen.dart';
 import 'screens/main_scaffold.dart';
+import 'screens/splash_principle_screen.dart';
 import 'services/supabase_service.dart';
 import 'theme/slip_theme.dart';
 
@@ -38,6 +39,7 @@ class SlipApp extends StatefulWidget {
 }
 
 class _SlipAppState extends State<SlipApp> {
+  bool _showSplash = true;
   bool _isAuthenticated = false;
 
   @override
@@ -59,6 +61,12 @@ class _SlipAppState extends State<SlipApp> {
     }
   }
 
+  void _onSplashComplete() {
+    setState(() {
+      _showSplash = false;
+    });
+  }
+
   void _onAuthenticated() {
     setState(() {
       _isAuthenticated = true;
@@ -77,9 +85,11 @@ class _SlipAppState extends State<SlipApp> {
       title: 'Slip',
       debugShowCheckedModeBanner: false,
       theme: SlipTheme.lightTheme,
-      home: _isAuthenticated
-          ? MainScaffold(onSignOut: _onSignOut)
-          : AuthScreen(onAuthenticated: _onAuthenticated),
+      home: _showSplash
+          ? SplashPrincipleScreen(onComplete: _onSplashComplete)
+          : _isAuthenticated
+              ? MainScaffold(onSignOut: _onSignOut)
+              : AuthScreen(onAuthenticated: _onAuthenticated),
     );
   }
 }

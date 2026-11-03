@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../constants/gate_syllabus.dart';
 import '../services/supabase_service.dart';
 import '../theme/slip_theme.dart';
 import '../widgets/hairline_input.dart';
@@ -13,13 +14,15 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  final TextEditingController _usernameController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-
   bool _isSignUp = false;
-  bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
+
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  
+  // A student can select 1 or 2 papers (e.g. CS + DA, EC + EE)
+  final Set<String> _selectedExams = {GateSyllabus.gateCS};
 
   @override
   void dispose() {
@@ -28,13 +31,54 @@ class _AuthScreenState extends State<AuthScreen> {
     super.dispose();
   }
 
+  void _toggleExam(String exam) {
+    setState(() {
+      if (_selectedExams.contains(exam)) {
+        if (_selectedExams.length > 1) {
+          _selectedExams.remove(exam);
+        }
+      } else {
+        if (_selectedExams.length >= 2) {
+          // If already 2 selected, remove the first one to allow the new one
+          _selectedExams.remove(_selectedExams.first);
+        }
+        _selectedExams.add(exam);
+      }
+    });
+  }
+
+  Future<void> _enterViaMesh() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final service = SupabaseService();
+    final handle = _usernameController.text.trim().isNotEmpty
+        ? _usernameController.text.trim()
+        : null;
+
+    final success = await service.signInAsMeshPeer(
+      customHandle: handle,
+      targetExams: _selectedExams.toList(),
+    );
+
+    setState(() => _isLoading = false);
+
+    if (success) {
+      widget.onAuthenticated();
+    } else {
+      setState(() => _errorMessage = 'COULD NOT INITIALIZE PEER MESH.');
+    }
+  }
+
   Future<void> _handleAuth() async {
     final username = _usernameController.text.trim();
-    final password = _passwordController.text.trim();
+    final password = _passwordController.text;
 
     if (username.isEmpty || password.isEmpty) {
       setState(() {
-        _errorMessage = 'ENTER BOTH USERNAME AND PASSWORD';
+        _errorMessage = 'PLEASE ENTER USERNAME AND PASSWORD.';
       });
       return;
     }
@@ -51,6 +95,7 @@ class _AuthScreenState extends State<AuthScreen> {
       success = await service.signUpWithUsername(
         username: username,
         password: password,
+        targetExams: _selectedExams.toList(),
       );
     } else {
       success = await service.signInWithUsername(
@@ -59,24 +104,15 @@ class _AuthScreenState extends State<AuthScreen> {
       );
     }
 
-    setState(() {
-      _isLoading = false;
-    });
+    setState(() => _isLoading = false);
 
     if (success) {
       widget.onAuthenticated();
     } else {
       setState(() {
-        _errorMessage = _isSignUp
-            ? 'USERNAME ALREADY IN USE OR INVALID PASSWORD.'
-            : 'INVALID USERNAME OR PASSWORD. TRY AGAIN.';
+        _errorMessage = 'COULD NOT SIGN IN. TRY ENTERING VIA MESH.';
       });
     }
-  }
-
-  void _bypassWithKey() {
-    // Instant peer entry using local cryptographic identity
-    widget.onAuthenticated();
   }
 
   @override
@@ -84,278 +120,273 @@ class _AuthScreenState extends State<AuthScreen> {
     return Scaffold(
       backgroundColor: SlipTheme.canvas,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top Status Telemetry Strip
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Clean Logo & Subtitle
+                  Text(
+                    'Slip',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: SlipTheme.carbon,
+                          letterSpacing: -0.5,
+                        ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Learn from peer blunders · Inoculate before GATE 2027',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: SlipTheme.steel,
+                        ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // SELECT PAPERS SECTION (UP TO 2)
+                  Text(
+                    'SELECT YOUR PAPERS (UP TO 2)',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: SlipTheme.steel,
+                          letterSpacing: 0.6,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: GateSyllabus.supportedExams.map((exam) {
+                      final isSelected = _selectedExams.contains(exam);
+                      final label = exam.replaceAll(' 2027', '');
+                      return InkWell(
+                        onTap: () => _toggleExam(exam),
+                        borderRadius: BorderRadius.circular(3),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? SlipTheme.carbon
+                                : SlipTheme.surface,
+                            borderRadius: BorderRadius.circular(3),
+                            border: Border.all(
+                              color: isSelected
+                                  ? SlipTheme.carbon
+                                  : SlipTheme.hairline,
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Text(
+                            label,
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: isSelected
+                                      ? SlipTheme.canvas
+                                      : SlipTheme.carbon,
+                                  letterSpacing: 0.5,
+                                ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'You will only see mistake logs for your selected papers.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: SlipTheme.steel,
+                          fontSize: 11,
+                        ),
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // 1-TAP INSTANT MESH ACCESS
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: SlipTheme.surface,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: SlipTheme.hairline, width: 0.8),
+                    ),
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'OFFLINE PEER ACCESS',
+                          style:
+                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: SlipTheme.steel,
+                                    letterSpacing: 0.8,
+                                  ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Enter instantly as an anonymous peer via BLE Mesh. No email or password needed.',
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: SlipTheme.carbon,
+                                    height: 1.4,
+                                  ),
+                        ),
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 44,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _enterViaMesh,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: SlipTheme.carbon,
+                              foregroundColor: SlipTheme.canvas,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation(
+                                          SlipTheme.canvas),
+                                    ),
+                                  )
+                                : Text(
+                                    'ENTER VIA BLE MESH',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelMedium
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: SlipTheme.canvas,
+                                          letterSpacing: 0.6,
+                                        ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // Minimalist Divider
                   Row(
                     children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: const BoxDecoration(
-                          color: SlipTheme.clearedGreen,
-                          shape: BoxShape.circle,
+                      const Expanded(
+                        child: Divider(color: SlipTheme.hairline, height: 1),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          'OR USE ACCOUNT',
+                          style:
+                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: SlipTheme.steel,
+                                    fontSize: 10,
+                                    letterSpacing: 0.6,
+                                  ),
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'AP-SOUTH-1 // PEER MESH ACTIVE',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: SlipTheme.textPrimary,
-                            ),
+                      const Expanded(
+                        child: Divider(color: SlipTheme.hairline, height: 1),
                       ),
                     ],
                   ),
-                  Text(
-                    'TLS 1.3',
-                    style: Theme.of(context).textTheme.labelSmall,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 36),
 
-              // Stark Wordmark
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    'SLIP',
-                    style: Theme.of(context).textTheme.displayLarge,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '[SYS // 01]',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: SlipTheme.textSecondary,
-                        ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'AUTH // PEER_INOCULATION_NETWORK · v1.0',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: SlipTheme.textSecondary,
-                    ),
-              ),
-              const SizedBox(height: 28),
+                  const SizedBox(height: 22),
 
-              // Segment Switch: [ SIGN IN ] vs [ CREATE ACCOUNT ]
-              Row(
-                children: [
-                  _AuthTab(
-                    label: 'SIGN IN',
-                    isActive: !_isSignUp,
-                    onTap: () => setState(() {
-                      _isSignUp = false;
-                      _errorMessage = null;
-                    }),
+                  // Username Input
+                  HairlineInput(
+                    label: 'USERNAME',
+                    hint: 'Choose your peer handle (e.g. arya)',
+                    controller: _usernameController,
                   ),
-                  const SizedBox(width: 20),
-                  _AuthTab(
-                    label: 'CREATE ACCOUNT',
-                    isActive: _isSignUp,
-                    onTap: () => setState(() {
-                      _isSignUp = true;
-                      _errorMessage = null;
-                    }),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 28),
+                  const SizedBox(height: 14),
 
-              if (_errorMessage != null) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: SlipTheme.trapRed.withOpacity(0.08),
-                    border: Border.all(color: SlipTheme.trapRed, width: 0.8),
-                    borderRadius: BorderRadius.circular(2),
+                  // Password Input
+                  HairlineInput(
+                    label: 'PASSWORD',
+                    hint: '••••••••',
+                    isPassword: true,
+                    controller: _passwordController,
                   ),
-                  child: Text(
-                    _errorMessage!,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: SlipTheme.trapRed,
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
 
-              // 1. Username Input (Pure Username, Zero Email)
-              HairlineInput(
-                label: 'USERNAME',
-                placeholder: 'e.g. shyam_gate',
-                controller: _usernameController,
-                helperText: 'UNIQUE HANDLE',
-              ),
-              const SizedBox(height: 24),
-
-              // 2. Password Input
-              HairlineInput(
-                label: 'PASSWORD',
-                placeholder: '••••••••••••',
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                helperText: 'MIN 6 CHARS',
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscurePassword
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
-                    size: 16,
-                    color: SlipTheme.textSecondary,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _obscurePassword = !_obscurePassword;
-                    });
-                  },
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Exam Stream Badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  border: Border.all(color: SlipTheme.hairline, width: 0.8),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.school_outlined,
-                      size: 14,
-                      color: SlipTheme.textPrimary,
-                    ),
-                    const SizedBox(width: 8),
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 12),
                     Text(
-                      'TARGET STREAM: GATE CS 2027',
+                      _errorMessage!,
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: SlipTheme.textPrimary,
+                            color: SlipTheme.trapRed,
+                            fontWeight: FontWeight.w600,
                           ),
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(height: 28),
 
-              // Primary Action Button
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _handleAuth,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: SlipTheme.carbon,
-                    foregroundColor: SlipTheme.canvas,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation(SlipTheme.canvas),
-                          ),
-                        )
-                      : Text(
-                          _isSignUp
-                              ? 'CREATE USERNAME & JOIN'
-                              : 'SIGN IN TO STREAM',
-                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                color: SlipTheme.canvas,
-                                letterSpacing: 0.8,
-                              ),
+                  const SizedBox(height: 20),
+
+                  // Sign In / Create Account Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: OutlinedButton(
+                      onPressed: _isLoading ? null : _handleAuth,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: SlipTheme.carbon,
+                        side:
+                            const BorderSide(color: SlipTheme.carbon, width: 1),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(3),
                         ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Secondary Key Bypass (Cryptographic Identity / Mesh)
-              Center(
-                child: TextButton(
-                  onPressed: _bypassWithKey,
-                  child: Text(
-                    'OR CONTINUE WITH CRYPTOGRAPHIC KEY // BLE MESH',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: SlipTheme.textSecondary,
-                          decoration: TextDecoration.underline,
-                        ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 36),
-
-              // Whisper Security Footer
-              Center(
-                child: Text(
-                  'Zero cloud tracking without consent · Open Source · Encrypted Telemetry',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: SlipTheme.textTertiary,
-                        fontSize: 9,
                       ),
-                  textAlign: TextAlign.center,
-                ),
+                      child: Text(
+                        _isSignUp ? 'CREATE ACCOUNT' : 'SIGN IN',
+                        style:
+                            Theme.of(context).textTheme.labelMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.6,
+                                ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Toggle between Sign In and Sign Up
+                  Center(
+                    child: TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _isSignUp = !_isSignUp;
+                          _errorMessage = null;
+                        });
+                      },
+                      child: Text(
+                        _isSignUp
+                            ? 'Already have an account? Sign in'
+                            : 'Don\'t have an account? Create one',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: SlipTheme.steel,
+                            ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _AuthTab extends StatelessWidget {
-  final String label;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  const _AuthTab({
-    required this.label,
-    required this.isActive,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: isActive ? SlipTheme.textPrimary : SlipTheme.textTertiary,
-                  letterSpacing: 0.8,
-                ),
-          ),
-          const SizedBox(height: 4),
-          Container(
-            width: 24,
-            height: 2,
-            color: isActive ? SlipTheme.textPrimary : Colors.transparent,
-          ),
-        ],
       ),
     );
   }

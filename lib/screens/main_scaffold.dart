@@ -3,8 +3,8 @@ import '../providers/slip_provider.dart';
 import '../theme/slip_theme.dart';
 import '../widgets/nav_dock.dart';
 import 'drop_slip_screen.dart';
+import 'notifications_screen.dart';
 import 'profile_screen.dart';
-import 'settings_screen.dart';
 import 'stream_screen.dart';
 
 class MainScaffold extends StatefulWidget {
@@ -50,8 +50,15 @@ class _MainScaffoldState extends State<MainScaffold> {
               children: [
                 StreamScreen(provider: _slipProvider),
                 DropSlipScreen(provider: _slipProvider),
-                ProfileScreen(provider: _slipProvider),
-                SettingsScreen(onSignOut: widget.onSignOut),
+                NotificationsScreen(
+                  onOpenReviewCycle: () {
+                    _slipProvider.setTabIndex(0);
+                  },
+                ),
+                ProfileScreen(
+                  provider: _slipProvider,
+                  onSignOut: widget.onSignOut,
+                ),
               ],
             ),
           ),

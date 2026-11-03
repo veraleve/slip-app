@@ -1,18 +1,18 @@
 class Profile {
   final String id;
   final String handle;
-  final String targetExam;
+  final List<String> targetExams;
   final String? avatarGlyph;
   final int sharedCount;
   final int clearedCount;
   final int savedCount;
-  final Map<String, double> topicMastery; // e.g. 'Linear Algebra': 0.88
+  final Map<String, double> topicMastery;
   final DateTime createdAt;
 
   const Profile({
     required this.id,
     required this.handle,
-    this.targetExam = 'GATE CS 2027',
+    this.targetExams = const ['GATE CS 2027'],
     this.avatarGlyph,
     this.sharedCount = 0,
     this.clearedCount = 0,
@@ -21,11 +21,23 @@ class Profile {
     required this.createdAt,
   });
 
+  String get primaryExam => targetExams.isNotEmpty ? targetExams.first : 'GATE CS 2027';
+
   factory Profile.fromJson(Map<String, dynamic> json) {
+    List<String> exams = [];
+    if (json['target_exams'] is List) {
+      exams = (json['target_exams'] as List).map((e) => e.toString()).toList();
+    } else if (json['target_exam'] is String && (json['target_exam'] as String).isNotEmpty) {
+      exams = [json['target_exam'] as String];
+    }
+    if (exams.isEmpty) {
+      exams = ['GATE CS 2027'];
+    }
+
     return Profile(
       id: json['id'] as String,
       handle: json['handle'] as String? ?? 'peer_anonymous',
-      targetExam: json['target_exam'] as String? ?? 'GATE CS 2027',
+      targetExams: exams,
       avatarGlyph: json['avatar_glyph'] as String?,
       sharedCount: json['shared_count'] as int? ?? 0,
       clearedCount: json['cleared_count'] as int? ?? 0,
@@ -43,7 +55,8 @@ class Profile {
     return {
       'id': id,
       'handle': handle,
-      'target_exam': targetExam,
+      'target_exams': targetExams,
+      'target_exam': primaryExam,
       'avatar_glyph': avatarGlyph,
       'shared_count': sharedCount,
       'cleared_count': clearedCount,

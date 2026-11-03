@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import '../constants/app_constants.dart';
+import '../constants/gate_syllabus.dart';
 import '../providers/slip_provider.dart';
+import '../services/native_device_service.dart';
 import '../theme/slip_theme.dart';
 import '../widgets/hairline_input.dart';
 
@@ -14,14 +16,23 @@ class DropSlipScreen extends StatefulWidget {
 }
 
 class _DropSlipScreenState extends State<DropSlipScreen> {
-  String _selectedTopic = AppConstants.gateTopics.first;
+  late String _selectedExam;
+  late String _selectedSubject;
   final TextEditingController _subtopicController = TextEditingController();
   final TextEditingController _trapController = TextEditingController();
   final TextEditingController _fixController = TextEditingController();
 
-  bool _hasVoiceRecording = false;
-  int _audioSeconds = 0;
+  final List<String> _attachedImages = [];
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final userExams = widget.provider.userExams;
+    _selectedExam = userExams.isNotEmpty ? userExams.first : GateSyllabus.gateCS;
+    final subjects = GateSyllabus.getSubjectsForExam(_selectedExam);
+    _selectedSubject = subjects.first;
+  }
 
   @override
   void dispose() {
@@ -29,6 +40,31 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
     _trapController.dispose();
     _fixController.dispose();
     super.dispose();
+  }
+
+  void _onExamChanged(String exam) {
+    setState(() {
+      _selectedExam = exam;
+      final subjects = GateSyllabus.getSubjectsForExam(exam);
+      _selectedSubject = subjects.first;
+      _subtopicController.clear();
+    });
+  }
+
+  void _onSubjectChanged(String subject) {
+    setState(() {
+      _selectedSubject = subject;
+      _subtopicController.clear();
+    });
+  }
+
+  Future<void> _capturePhoto() async {
+    final photoPath = await NativeDeviceService.capturePhoto();
+    if (photoPath != null && photoPath.isNotEmpty) {
+      setState(() {
+        _attachedImages.add(photoPath);
+      });
+    }
   }
 
   Future<void> _submitSlip() async {
@@ -39,10 +75,10 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'PLEASE FILL BOTH THE TRAP AND THE FIX',
+            'Please fill both the blunder and the fix.',
             style: Theme.of(context)
                 .textTheme
-                .labelSmall
+                .bodySmall
                 ?.copyWith(color: SlipTheme.canvas),
           ),
           backgroundColor: SlipTheme.trapRed,
@@ -53,260 +89,312 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
 
     setState(() => _isSubmitting = true);
 
+    final subtopic = _subtopicController.text.trim().isNotEmpty
+        ? _subtopicController.text.trim()
+        : 'General Trap';
+
     final success = await widget.provider.dropSlip(
-      topic: _selectedTopic,
-      subtopic: _subtopicController.text.trim().isNotEmpty
-          ? _subtopicController.text.trim()
-          : 'General Trap',
+      examTag: _selectedExam,
+      topic: _selectedSubject,
+      subtopic: subtopic,
       trapStatement: trap,
       fixStatement: fix,
-      audioDurationSeconds: _hasVoiceRecording ? _audioSeconds : 0,
+      imageUris: _attachedImages,
     );
 
     setState(() => _isSubmitting = false);
 
     if (success && mounted) {
+      // Trigger notification confirmation
+      NativeDeviceService.showNotification(
+        title: 'Blunder Logged to $_selectedExam',
+        body: 'Your mistake on "$_selectedSubject" is now inoculating peers.',
+      );
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'SLIP DROPPED & BROADCAST TO PEER MESH',
+            'Mistake logged and shared with peers.',
             style: Theme.of(context)
                 .textTheme
-                .labelSmall
+                .bodySmall
                 ?.copyWith(color: SlipTheme.canvas),
           ),
           backgroundColor: SlipTheme.carbon,
         ),
       );
-      // Switch back to stream tab
       widget.provider.setTabIndex(0);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final availableSubjects = GateSyllabus.getSubjectsForExam(_selectedExam);
+    final suggestedSubtopics =
+        GateSyllabus.getSubtopics(_selectedExam, _selectedSubject);
+
     return Scaffold(
       backgroundColor: SlipTheme.canvas,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'DROP A SLIP',
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                            ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'LOG YOUR TEST BLUNDER TO INOCULATE PEERS',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: SlipTheme.steel,
-                            ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: SlipTheme.hairline, width: 0.8),
-                      borderRadius: BorderRadius.circular(2),
+              // Clean Header
+              Text(
+                'Drop a Blunder',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: SlipTheme.carbon,
+                      letterSpacing: -0.5,
                     ),
-                    child: Text(
-                      'GATE CS 2027',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Log test blunders to inoculate yourself and your peers.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: SlipTheme.steel,
                     ),
-                  ),
-                ],
               ),
               const SizedBox(height: 24),
 
-              // Topic Dropdown
+              // 1. Exam Paper Selector
               Text(
-                'SUBJECT / DOMAIN',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                'EXAM PAPER',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.w700,
+                      color: SlipTheme.steel,
+                    ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                children: GateSyllabus.supportedExams.map((exam) {
+                  final isSelected = _selectedExam == exam;
+                  final label = exam.replaceAll(' 2027', '');
+                  return ChoiceChip(
+                    label: Text(label),
+                    selected: isSelected,
+                    onSelected: (val) {
+                      if (val) _onExamChanged(exam);
+                    },
+                    selectedColor: SlipTheme.carbon,
+                    backgroundColor: SlipTheme.surface,
+                    labelStyle: TextStyle(
+                      color: isSelected ? SlipTheme.canvas : SlipTheme.carbon,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(3),
+                      side: BorderSide(
+                        color: isSelected ? SlipTheme.carbon : SlipTheme.hairline,
+                        width: 0.8,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+
+              const SizedBox(height: 18),
+
+              // 2. Syllabus Subject Dropdown
+              Text(
+                'SUBJECT',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: SlipTheme.steel,
                     ),
               ),
               const SizedBox(height: 6),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
                   color: SlipTheme.surface,
                   border: Border.all(color: SlipTheme.hairline, width: 0.8),
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(3),
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
-                    value: _selectedTopic,
+                    value: availableSubjects.contains(_selectedSubject)
+                        ? _selectedSubject
+                        : availableSubjects.first,
                     isExpanded: true,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: SlipTheme.carbon,
                           fontWeight: FontWeight.w600,
                         ),
-                    items: AppConstants.gateTopics.map((topic) {
-                      return DropdownMenuItem(
-                        value: topic,
-                        child: Text(topic),
+                    items: availableSubjects.map((sub) {
+                      return DropdownMenuItem<String>(
+                        value: sub,
+                        child: Text(sub),
                       );
                     }).toList(),
                     onChanged: (val) {
-                      if (val != null) {
-                        setState(() => _selectedTopic = val);
-                      }
+                      if (val != null) _onSubjectChanged(val);
                     },
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
 
-              // Subtopic Input
+              const SizedBox(height: 18),
+
+              // 3. Subtopic Input + Quick Suggestions
               HairlineInput(
-                label: 'SPECIFIC TOPIC // SUB-CONCEPT',
-                placeholder: 'e.g. Eigenvalues, Paging, Deadlock',
+                label: 'SUBTOPIC / CONCEPT',
+                hint: 'e.g. Eigenvalues or select below',
                 controller: _subtopicController,
-                helperText: 'OPTIONAL',
               ),
-              const SizedBox(height: 20),
-
-              // The Trap Statement
-              HairlineInput(
-                label: 'THE FATAL TRAP // YOUR MISTAKE',
-                placeholder:
-                    'What misconception made you pick the wrong option or calculate wrongly?',
-                controller: _trapController,
-                helperText: 'CRITICAL',
-              ),
-              const SizedBox(height: 20),
-
-              // The Fix Statement
-              HairlineInput(
-                label: 'THE FIX // THE RIGOROUS TRUTH',
-                placeholder:
-                    'What is the actual theorem, formula, or counter-example?',
-                controller: _fixController,
-                helperText: 'ANTIDOTE',
-              ),
-              const SizedBox(height: 24),
-
-              // Evidence Capture Buttons
-              Text(
-                'ATTACH EVIDENCE (OPTIONAL)',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  // Scratchpad Camera Scan
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'SCRATCHPAD PHOTO ATTACHED',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
-                                  ?.copyWith(color: SlipTheme.canvas),
-                            ),
-                            backgroundColor: SlipTheme.carbon,
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.document_scanner_outlined, size: 16),
-                      label: Text(
-                        'NOTEBOOK SCAN',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: SlipTheme.carbon,
-                        side: const BorderSide(
-                            color: SlipTheme.hairline, width: 0.8),
+              if (suggestedSubtopics.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 28,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: suggestedSubtopics.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 6),
+                    itemBuilder: (context, index) {
+                      final item = suggestedSubtopics[index];
+                      return ActionChip(
+                        label: Text(item),
+                        labelStyle: const TextStyle(
+                          fontSize: 10,
+                          color: SlipTheme.carbon,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        backgroundColor: SlipTheme.surface,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(2),
+                          side: const BorderSide(
+                              color: SlipTheme.hairline, width: 0.6),
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        onPressed: () {
+                          setState(() {
+                            _subtopicController.text = item;
+                          });
+                        },
+                      );
+                    },
                   ),
-                  const SizedBox(width: 10),
+                ),
+              ],
 
-                  // Voice Autopsy
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _hasVoiceRecording = !_hasVoiceRecording;
-                          _audioSeconds = 34;
-                        });
-                      },
-                      icon: Icon(
-                        _hasVoiceRecording
-                            ? Icons.mic_rounded
-                            : Icons.mic_none_rounded,
-                        size: 16,
-                        color: _hasVoiceRecording
-                            ? SlipTheme.trapRed
-                            : SlipTheme.carbon,
-                      ),
-                      label: Text(
-                        _hasVoiceRecording ? '34s VOICE NOTE' : 'VOICE AUTOPSY',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: _hasVoiceRecording
-                                  ? SlipTheme.trapRed
-                                  : SlipTheme.carbon,
-                            ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: SlipTheme.carbon,
-                        side: BorderSide(
-                          color: _hasVoiceRecording
-                              ? SlipTheme.trapRed
-                              : SlipTheme.hairline,
-                          width: 0.8,
+              const SizedBox(height: 20),
+
+              // 4. The Blunder Trap
+              HairlineInput(
+                label: 'THE TRAP (WHAT WENT WRONG)',
+                hint: 'State your misconception or calculation trap clearly...',
+                maxLines: 3,
+                controller: _trapController,
+              ),
+
+              const SizedBox(height: 20),
+
+              // 5. The Fix
+              HairlineInput(
+                label: 'THE FIX (CONCEPTUAL TRUTH)',
+                hint: 'What is the precise rule, theorem, or check to never repeat this?',
+                maxLines: 3,
+                controller: _fixController,
+              ),
+
+              const SizedBox(height: 20),
+
+              // 6. Camera Photo Attachments (Multiple Images)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'QUESTION / ROUGH SHEET PHOTOS',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: SlipTheme.steel,
                         ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _capturePhoto,
+                    icon: const Icon(Icons.camera_alt_outlined, size: 14),
+                    label: Text(
+                      _attachedImages.isEmpty ? 'SNAP PHOTO' : '+ ADD MORE',
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: SlipTheme.carbon,
+                      side: const BorderSide(color: SlipTheme.hairline, width: 0.8),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      visualDensity: VisualDensity.compact,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 32),
+              if (_attachedImages.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 72,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _attachedImages.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final path = _attachedImages[index];
+                      return Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(3),
+                            child: Image.file(
+                              File(path),
+                              width: 72,
+                              height: 72,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          Positioned(
+                            top: 2,
+                            right: 2,
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _attachedImages.removeAt(index);
+                                });
+                              },
+                              child: Container(
+                                decoration: const BoxDecoration(
+                                  color: Colors.black70,
+                                  shape: BoxShape.circle,
+                                ),
+                                padding: const EdgeInsets.all(2),
+                                child: const Icon(
+                                  Icons.close_rounded,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
 
-              // Publish Button
+              const SizedBox(height: 28),
+
+              // Submit Button
               SizedBox(
                 width: double.infinity,
-                height: 48,
+                height: 46,
                 child: ElevatedButton(
                   onPressed: _isSubmitting ? null : _submitSlip,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: SlipTheme.carbon,
                     foregroundColor: SlipTheme.canvas,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(3),
                     ),
                     elevation: 0,
                   ),
@@ -316,19 +404,21 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                           height: 18,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation(SlipTheme.canvas),
+                            valueColor:
+                                AlwaysStoppedAnimation(SlipTheme.canvas),
                           ),
                         )
                       : Text(
-                          'PUBLISH SLIP TO PEER MESH // AP-SOUTH-1',
-                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                color: SlipTheme.canvas,
-                                letterSpacing: 0.8,
-                              ),
+                          'DROP SLIP',
+                          style:
+                              Theme.of(context).textTheme.labelMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: SlipTheme.canvas,
+                                    letterSpacing: 0.8,
+                                  ),
                         ),
                 ),
               ),
-              const SizedBox(height: 24),
             ],
           ),
         ),

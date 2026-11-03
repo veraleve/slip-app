@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import '../models/slip.dart';
 import '../theme/slip_theme.dart';
 import 'audio_waveform_strip.dart';
+import 'comment_thread_sheet.dart';
+import 'image_gallery_grid.dart';
 
-class SlipCard extends StatelessWidget {
+class SlipCard extends StatefulWidget {
   final int index;
   final Slip slip;
   final VoidCallback onSameTap;
   final VoidCallback onFixToggle;
   final VoidCallback onKeepTap;
+  final VoidCallback onSolveTap;
   final VoidCallback onPassTap;
 
   const SlipCard({
@@ -18,28 +21,43 @@ class SlipCard extends StatelessWidget {
     required this.onSameTap,
     required this.onFixToggle,
     required this.onKeepTap,
+    required this.onSolveTap,
     required this.onPassTap,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final slipNumber = (index + 1).toString().padLeft(2, '0');
+  State<SlipCard> createState() => _SlipCardState();
+}
 
-    return Padding(
+class _SlipCardState extends State<SlipCard> {
+  bool _showComments = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final slip = widget.slip;
+    final examShort = slip.examTag.replaceAll('GATE ', '').replaceAll(' 2027', '');
+
+    return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: SlipTheme.hairline, width: 0.8),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Whisper Metadata Bar
+          // 1. Clean Subject & Exam Breadcrumb
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
                 child: Text(
-                  '$slipNumber // ${slip.topic.toUpperCase()} · ${slip.subtopic?.toUpperCase() ?? "GENERAL"}',
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
+                  '${slip.topic} · ${slip.subtopic ?? "General"}',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
                         color: SlipTheme.steel,
+                        letterSpacing: 0.2,
                       ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -49,13 +67,15 @@ class SlipCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  border: Border.all(color: SlipTheme.hairline, width: 0.8),
+                  color: SlipTheme.surface,
                   borderRadius: BorderRadius.circular(2),
+                  border: Border.all(color: SlipTheme.hairline, width: 0.6),
                 ),
                 child: Text(
-                  slip.examTag,
+                  examShort,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 9.5,
                         color: SlipTheme.carbon,
                       ),
                 ),
@@ -64,57 +84,61 @@ class SlipCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
 
-          // 2. The Trap Statement
+          // 2. The Trap Blunder Statement
           Text(
             slip.trapStatement,
-            style: Theme.of(context).textTheme.headlineSmall,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: SlipTheme.carbon,
+                  height: 1.4,
+                  fontSize: 15,
+                ),
           ),
-          const SizedBox(height: 14),
 
-          // 3. Audio Waveform Autopsy
-          if (slip.audioDurationSeconds > 0) ...[
-            AudioWaveformStrip(
-              totalSeconds: slip.audioDurationSeconds,
-              studentTranscript:
-                  'Audio note: "I confused the null space condition with nilpotency..."',
-            ),
-            const SizedBox(height: 14),
+          // 3. Multi-image LinkedIn-Style Gallery Grid
+          if (slip.imageUris.isNotEmpty) ...[
+            ImageGalleryGrid(imageUris: slip.imageUris),
           ],
 
-          // 4. Cognitive Shift: The Fix (Revealed or Toggle)
+          // 4. Optional Audio Autopsy
+          if (slip.audioDurationSeconds > 0) ...[
+            const SizedBox(height: 10),
+            AudioWaveformStrip(
+              totalSeconds: slip.audioDurationSeconds,
+              studentTranscript: 'Audio blunder note (${slip.audioDurationSeconds}s)',
+            ),
+          ],
+
+          const SizedBox(height: 12),
+
+          // 5. The Fix (Expandable & Clean)
           if (slip.isFixRevealed) ...[
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: SlipTheme.canvas,
-                border: Border.all(color: SlipTheme.hairline, width: 0.8),
-                borderRadius: BorderRadius.circular(2),
+                color: SlipTheme.surface,
+                borderRadius: BorderRadius.circular(3),
+                border: const Border(
+                  left: BorderSide(color: SlipTheme.clearedGreen, width: 2.5),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.check_circle_outline_rounded,
-                        size: 14,
-                        color: SlipTheme.clearedGreen,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'THE FIX // CONCEPTUAL TRUTH',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: SlipTheme.clearedGreen,
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                    ],
+                  Text(
+                    'THE FIX',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: SlipTheme.clearedGreen,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 10,
+                          letterSpacing: 0.5,
+                        ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     slip.fixStatement,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: SlipTheme.carbon,
                           height: 1.45,
                         ),
@@ -122,122 +146,149 @@ class SlipCard extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
           ],
 
-          // 5. Tactile Action Controls (Same, The Fix, Keep, Pass)
+          // 6. Instagram-Style Clean Minimalist Action Row
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Same ("I fell for this too")
-              _ActionButton(
-                label: 'Same',
-                count: slip.sameCount,
-                isActive: slip.hasSaidSame,
-                activeColor: SlipTheme.trapRed,
-                icon: slip.hasSaidSame
-                    ? Icons.trending_up_rounded
-                    : Icons.trending_up_rounded,
-                onTap: onSameTap,
-              ),
-              const SizedBox(width: 8),
-
-              // The Fix Toggle
-              _ActionButton(
-                label: slip.isFixRevealed ? 'Hide Fix' : 'The Fix',
-                isActive: slip.isFixRevealed,
-                activeColor: SlipTheme.clearedGreen,
-                icon: slip.isFixRevealed
-                    ? Icons.visibility_off_outlined
-                    : Icons.lightbulb_outline_rounded,
-                onTap: onFixToggle,
-              ),
-              const Spacer(),
-
-              // Keep (Save)
-              IconButton(
-                onPressed: onKeepTap,
-                icon: Icon(
-                  slip.hasKept
-                      ? Icons.bookmark_rounded
-                      : Icons.bookmark_border_rounded,
-                  size: 18,
-                  color: slip.hasKept ? SlipTheme.carbon : SlipTheme.steel,
+              // Reveal / Hide Fix text button
+              InkWell(
+                onTap: widget.onFixToggle,
+                borderRadius: BorderRadius.circular(2),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                  child: Text(
+                    slip.isFixRevealed ? 'Hide fix' : 'Reveal fix',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: SlipTheme.carbon,
+                          fontWeight: FontWeight.w600,
+                          decoration: TextDecoration.underline,
+                        ),
+                  ),
                 ),
-                tooltip: 'Keep for revision',
-                visualDensity: VisualDensity.compact,
               ),
 
-              // Pass (Share)
-              IconButton(
-                onPressed: onPassTap,
-                icon: const Icon(
-                  Icons.share_outlined,
-                  size: 18,
-                  color: SlipTheme.steel,
-                ),
-                tooltip: 'Pass to peer',
-                visualDensity: VisualDensity.compact,
+              // Instagram-style clean icons row
+              Row(
+                children: [
+                  // Same Reaction ("I fell for this too")
+                  InkWell(
+                    onTap: widget.onSameTap,
+                    borderRadius: BorderRadius.circular(2),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                      child: Row(
+                        children: [
+                          Icon(
+                            slip.hasSaidSame
+                                ? Icons.warning_rounded
+                                : Icons.warning_amber_rounded,
+                            size: 17,
+                            color: slip.hasSaidSame
+                                ? SlipTheme.trapRed
+                                : SlipTheme.steel,
+                          ),
+                          if (slip.sameCount > 0) ...[
+                            const SizedBox(width: 4),
+                            Text(
+                              '${slip.sameCount}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: slip.hasSaidSame
+                                    ? SlipTheme.trapRed
+                                    : SlipTheme.steel,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Save / Bookmark (Adds to My Review Cycle)
+                  InkWell(
+                    onTap: widget.onKeepTap,
+                    borderRadius: BorderRadius.circular(2),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                      child: Icon(
+                        slip.hasKept
+                            ? Icons.bookmark_rounded
+                            : Icons.bookmark_border_rounded,
+                        size: 17,
+                        color: slip.hasKept
+                            ? SlipTheme.carbon
+                            : SlipTheme.steel,
+                      ),
+                    ),
+                  ),
+
+                  // Solve / Mastered Checkmark Icon
+                  InkWell(
+                    onTap: widget.onSolveTap,
+                    borderRadius: BorderRadius.circular(2),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                      child: Icon(
+                        slip.hasCleared
+                            ? Icons.check_circle_rounded
+                            : Icons.check_circle_outline_rounded,
+                        size: 17,
+                        color: slip.hasCleared
+                            ? SlipTheme.clearedGreen
+                            : SlipTheme.steel,
+                      ),
+                    ),
+                  ),
+
+                  // Comment Toggle (Chat Bubble)
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        _showComments = !_showComments;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(2),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                      child: Icon(
+                        _showComments
+                            ? Icons.chat_bubble_rounded
+                            : Icons.chat_bubble_outline_rounded,
+                        size: 16,
+                        color: _showComments
+                            ? SlipTheme.carbon
+                            : SlipTheme.steel,
+                      ),
+                    ),
+                  ),
+
+                  // Bluetooth Share / Beam
+                  InkWell(
+                    onTap: widget.onPassTap,
+                    borderRadius: BorderRadius.circular(2),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                      child: Icon(
+                        Icons.bluetooth_audio_rounded,
+                        size: 17,
+                        color: SlipTheme.steel,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
 
-          const SizedBox(height: 16),
-          const Divider(),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  final String label;
-  final int? count;
-  final bool isActive;
-  final Color activeColor;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _ActionButton({
-    required this.label,
-    this.count,
-    required this.isActive,
-    required this.activeColor,
-    required this.icon,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: isActive ? activeColor.withOpacity(0.08) : Colors.transparent,
-          border: Border.all(
-            color: isActive ? activeColor : SlipTheme.hairline,
-            width: 0.8,
-          ),
-          borderRadius: BorderRadius.circular(2),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 14,
-              color: isActive ? activeColor : SlipTheme.steel,
-            ),
-            const SizedBox(width: 5),
-            Text(
-              count != null ? '$label ($count)' : label,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: isActive ? activeColor : SlipTheme.carbon,
-                  ),
-            ),
+          // 7. Toggleable Inline Comments Sheet
+          if (_showComments) ...[
+            CommentThreadSheet(slipId: slip.id),
           ],
-        ),
+        ],
       ),
     );
   }

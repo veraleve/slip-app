@@ -6,6 +6,7 @@ class Slip {
   final String examTag;
   final String trapStatement;
   final String fixStatement;
+  final List<String> imageUris;
   final String? scratchpadImageUrl;
   final String? voiceAudioUrl;
   final String? whiteboardVideoUrl;
@@ -26,9 +27,10 @@ class Slip {
     this.authorId,
     required this.topic,
     this.subtopic,
-    this.examTag = 'GATE CS',
+    this.examTag = 'GATE CS 2027',
     required this.trapStatement,
     required this.fixStatement,
+    this.imageUris = const [],
     this.scratchpadImageUrl,
     this.voiceAudioUrl,
     this.whiteboardVideoUrl,
@@ -44,15 +46,23 @@ class Slip {
   });
 
   factory Slip.fromJson(Map<String, dynamic> json) {
+    List<String> images = [];
+    if (json['image_uris'] is List) {
+      images = (json['image_uris'] as List).map((e) => e.toString()).toList();
+    } else if (json['scratchpad_image_url'] != null && (json['scratchpad_image_url'] as String).isNotEmpty) {
+      images = [json['scratchpad_image_url'] as String];
+    }
+
     return Slip(
       id: json['id'] as String,
       authorId: json['author_id'] as String?,
       topic: json['topic'] as String? ?? 'General',
       subtopic: json['subtopic'] as String?,
-      examTag: json['exam_tag'] as String? ?? 'GATE CS',
+      examTag: json['exam_tag'] as String? ?? 'GATE CS 2027',
       trapStatement: json['trap_statement'] as String? ?? '',
       fixStatement: json['fix_statement'] as String? ?? '',
-      scratchpadImageUrl: json['scratchpad_image_url'] as String?,
+      imageUris: images,
+      scratchpadImageUrl: images.isNotEmpty ? images.first : null,
       voiceAudioUrl: json['voice_audio_url'] as String?,
       whiteboardVideoUrl: json['whiteboard_video_url'] as String?,
       audioDurationSeconds: json['audio_duration_seconds'] as int? ?? 0,
@@ -74,7 +84,8 @@ class Slip {
       'exam_tag': examTag,
       'trap_statement': trapStatement,
       'fix_statement': fixStatement,
-      'scratchpad_image_url': scratchpadImageUrl,
+      'image_uris': imageUris,
+      'scratchpad_image_url': imageUris.isNotEmpty ? imageUris.first : scratchpadImageUrl,
       'voice_audio_url': voiceAudioUrl,
       'whiteboard_video_url': whiteboardVideoUrl,
       'audio_duration_seconds': audioDurationSeconds,
@@ -93,6 +104,7 @@ class Slip {
     String? examTag,
     String? trapStatement,
     String? fixStatement,
+    List<String>? imageUris,
     String? scratchpadImageUrl,
     String? voiceAudioUrl,
     String? whiteboardVideoUrl,
@@ -114,6 +126,7 @@ class Slip {
       examTag: examTag ?? this.examTag,
       trapStatement: trapStatement ?? this.trapStatement,
       fixStatement: fixStatement ?? this.fixStatement,
+      imageUris: imageUris ?? this.imageUris,
       scratchpadImageUrl: scratchpadImageUrl ?? this.scratchpadImageUrl,
       voiceAudioUrl: voiceAudioUrl ?? this.voiceAudioUrl,
       whiteboardVideoUrl: whiteboardVideoUrl ?? this.whiteboardVideoUrl,
