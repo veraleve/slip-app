@@ -593,7 +593,7 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
 
       // 3. Google Tasks Right Bottom Floating Action Button (Positioned just above NavDock)
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 16, right: 10),
+        padding: const EdgeInsets.only(bottom: 6, right: 8),
         child: FloatingActionButton(
           onPressed: () => _showAddTaskSheet(
             defaultList: _currentTabIndex == 0

@@ -264,6 +264,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SettingsScreen(
+          provider: widget.provider,
           onSignOut: widget.onSignOut ?? () {},
         ),
       ),
@@ -1112,22 +1113,38 @@ class _ProfileScreenState extends State<ProfileScreen>
                         color: SlipTheme.carbon,
                       ),
                     ),
-                    Row(
-                      children: [
-                        // Edit Pencil Icon
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined, size: 16, color: SlipTheme.carbon),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          onPressed: () => _showEditPostDialog(slip),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert_rounded, size: 18, color: SlipTheme.carbon),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      onSelected: (val) {
+                        if (val == 'edit') {
+                          _showEditPostDialog(slip);
+                        } else if (val == 'delete') {
+                          _confirmDeletePost(slip);
+                        }
+                      },
+                      itemBuilder: (ctx) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit_outlined, size: 16, color: SlipTheme.carbon),
+                              SizedBox(width: 10),
+                              Text('Edit Post', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
                         ),
-                        const SizedBox(width: 14),
-                        // Delete Trash Icon
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline_rounded, size: 16, color: SlipTheme.trapRed),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          onPressed: () => _confirmDeletePost(slip),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline_rounded, size: 16, color: SlipTheme.trapRed),
+                              SizedBox(width: 10),
+                              Text('Delete Post', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: SlipTheme.trapRed)),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -1178,21 +1195,39 @@ class _ProfileScreenState extends State<ProfileScreen>
                         slip.topic,
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
                       ),
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 18),
-                            onPressed: () {
-                              Navigator.of(ctx).pop();
-                              _showEditPostDialog(slip);
-                            },
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert_rounded, size: 20, color: SlipTheme.carbon),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        onSelected: (val) {
+                          Navigator.of(ctx).pop();
+                          if (val == 'edit') {
+                            _showEditPostDialog(slip);
+                          } else if (val == 'delete') {
+                            _confirmDeletePost(slip);
+                          }
+                        },
+                        itemBuilder: (ctx) => [
+                          const PopupMenuItem(
+                            value: 'edit',
+                            child: Row(
+                              children: [
+                                Icon(Icons.edit_outlined, size: 16, color: SlipTheme.carbon),
+                                SizedBox(width: 10),
+                                Text('Edit Post', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                              ],
+                            ),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline_rounded, size: 18, color: SlipTheme.trapRed),
-                            onPressed: () {
-                              Navigator.of(ctx).pop();
-                              _confirmDeletePost(slip);
-                            },
+                          const PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete_outline_rounded, size: 16, color: SlipTheme.trapRed),
+                                SizedBox(width: 10),
+                                Text('Delete Post', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: SlipTheme.trapRed)),
+                              ],
+                            ),
                           ),
                         ],
                       ),

@@ -53,6 +53,7 @@ class _FeedScreenState extends State<FeedScreen>
     final provider = widget.provider;
     final userExams = provider.userExams;
     final currentUserId = SupabaseService().currentUserId;
+    final currentUsername = SupabaseService().currentUsername;
 
     final currentExam = provider.selectedExamFilter == 'All'
         ? (userExams.isNotEmpty ? userExams.first : GateSyllabus.gateCS)
@@ -61,8 +62,10 @@ class _FeedScreenState extends State<FeedScreen>
     final subjects = ['All', ...GateSyllabus.getSubjectsForExam(currentExam)];
 
     // Slips for My Review Cycle: (authored by user OR kept/saved by user)
-    final allReviewSlips = provider.slips.where((s) {
-      final isMine = s.authorId != null && s.authorId == currentUserId;
+    // CRITICAL: Filter from allSlips (not filtered slips) so personal blunders are never hidden
+    final allReviewSlips = provider.allSlips.where((s) {
+      final isMine = (s.authorId != null && s.authorId == currentUserId) ||
+          (s.authorUsername != null && s.authorUsername == currentUsername);
       final isSaved = s.hasKept;
       return isMine || isSaved;
     }).toList();

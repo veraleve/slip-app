@@ -67,12 +67,15 @@ jobs:
           body: |
             ## Slip — Ask doubts. Learn from mistakes. Master together.
 
-            ### What's New in this Release:
-            - In-App Self-Updater: Check for updates and install directly from GitHub Releases with zero data loss.
-            - Deep Post Detail: Tap any blunder card to view full explanations, high-res photos, voice notes, and discussion threads.
-            - Tasks Scheduler: Google Tasks layout rendered directly on canvas with mistaking inoculation traps.
-            - Session Persistence: Persistent authentication via SharedPreferences—no repeated login prompts upon reopen.
-            - Clean Swiss UI: Left-aligned action buttons (reactions, comments, cleared), right-aligned save icon, curved surfaces.
+            ### What's New in v0.1.8:
+            - Desktop Connect Web Bridge: Built-in local HTTP server (port 8080) to connect your laptop over Wi-Fi/Hotspot. Log test blunders and paste question screenshots with Ctrl+V with zero cloud fees.
+            - In-Text Clickable Links: Auto-detects http:// and https:// URLs across doubts, blunders, and comments, opening them natively in your browser.
+            - General Doubt Quick Chip: Ask doubts without mandatory syllabus subject tagging; simplifies doubt input form.
+            - Auto-Login & Session Persistence: Fixed app reopen prompt—sessions now persist reliably through device reboots and restarts.
+            - Settings Exam Papers Persistence: Target exam papers selection in Settings now saves immediately to local preferences.
+            - Post 3-Dot Overflow Menu: Replaced separate edit/delete icons with a clean 3-dot dropdown popup menu.
+            - Feed My Mistakes Tab Fix: Fixed mistake visibility filtering so local blunders remain visible across app restarts.
+            - Polished Google Tasks Layout: Removed boxed card layout, seamless canvas rendering, and optimized floating action button positioning.
 
             **Direct Download:** `slip.apk`
           files: build/app/outputs/flutter-apk/slip.apk

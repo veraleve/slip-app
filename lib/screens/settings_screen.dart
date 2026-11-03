@@ -1,17 +1,25 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../constants/app_constants.dart';
 import '../constants/gate_syllabus.dart';
+import '../providers/slip_provider.dart';
 import '../services/app_update_service.dart';
+import '../services/desktop_bridge/desktop_connect_service.dart';
 import '../services/native_device_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/slip_theme.dart';
 
 class SettingsScreen extends StatefulWidget {
   final VoidCallback onSignOut;
+  final SlipProvider? provider;
 
-  const SettingsScreen({super.key, required this.onSignOut});
+  const SettingsScreen({
+    super.key,
+    required this.onSignOut,
+    this.provider,
+  });
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -108,10 +116,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () async {
               Navigator.of(ctx).pop();
               await SupabaseService().signOut();
-              widget.onSignOut();
               if (mounted) {
                 Navigator.of(context).popUntil((route) => route.isFirst);
               }
+              widget.onSignOut();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: SlipTheme.trapRed,
@@ -342,6 +350,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _ExamPapersSettingsPage(
                     initialExams: userExams,
                     onSave: (updated) {
+                      widget.provider?.refreshStream();
                       setState(() {});
                     },
                   ),
@@ -414,6 +423,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onMeshToggle: (val) => setState(() => _meshEnabled = val),
                     onCacheToggle: (val) => setState(() => _offlineCacheEnabled = val),
                   ),
+                ),
+              ),
+              const _GroupDivider(),
+              _SettingGroupTile(
+                icon: Icons.laptop_chromebook_rounded,
+                iconColor: SlipTheme.carbon,
+                title: 'Desktop Connect & Local Server',
+                subtitle: DesktopConnectService().isRunning
+                    ? 'Active at ${DesktopConnectService().serverUrl}'
+                    : 'Log test blunders from laptop browser',
+                onTap: () => _navigateTo(
+                  context,
+                  _LocalServerSettingsPage(provider: widget.provider),
                 ),
               ),
             ],
@@ -724,18 +746,20 @@ class _ExamPapersSettingsPageState extends State<_ExamPapersSettingsPage> {
           ],
           const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final list = _selectedExams.toList();
-              SupabaseService().updateTargetExams(list);
+              await SupabaseService().updateTargetExams(list);
               widget.onSave(list);
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Target exam papers updated.'),
-                  backgroundColor: SlipTheme.carbon,
-                  duration: Duration(seconds: 1),
-                ),
-              );
+              if (context.mounted) {
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Target exam papers updated.'),
+                    backgroundColor: SlipTheme.carbon,
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: SlipTheme.carbon,
@@ -1704,3 +1728,298 @@ class _DownloadProgressModalState extends State<_DownloadProgressModal> {
     );
   }
 }
+
+// ==========================================
+// SUB-PAGE: DESKTOP CONNECT & LOCAL SERVER
+// ==========================================
+
+class _LocalServerSettingsPage extends StatefulWidget {
+  final SlipProvider? provider;
+
+  const _LocalServerSettingsPage({this.provider});
+
+  @override
+  State<_LocalServerSettingsPage> createState() => _LocalServerSettingsPageState();
+}
+
+class _LocalServerSettingsPageState extends State<_LocalServerSettingsPage> {
+  final DesktopConnectService _service = DesktopConnectService();
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _autoStartIfPossible();
+  }
+
+  Future<void> _autoStartIfPossible() async {
+    if (!_service.isRunning && widget.provider != null) {
+      setState(() => _isLoading = true);
+      await _service.startServer(widget.provider!);
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _toggleServer() async {
+    setState(() => _isLoading = true);
+    if (_service.isRunning) {
+      await _service.stopServer();
+    } else if (widget.provider != null) {
+      await _service.startServer(widget.provider!);
+    }
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  void _copyUrl(String url) {
+    Clipboard.setData(ClipboardData(text: url));
+    HapticFeedback.lightImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Copied $url to clipboard.'),
+        backgroundColor: SlipTheme.carbon,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isRunning = _service.isRunning;
+    final serverUrl = _service.serverUrl ?? 'http://127.0.0.1:8080';
+
+    return Scaffold(
+      backgroundColor: SlipTheme.canvas,
+      appBar: AppBar(
+        title: const Text('Desktop Connect', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+        backgroundColor: SlipTheme.canvas,
+        foregroundColor: SlipTheme.carbon,
+        elevation: 0,
+        centerTitle: true,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        children: [
+          // 1. Live Server Card
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: SlipTheme.cardBg,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isRunning ? const Color(0xFF10B981).withOpacity(0.4) : SlipTheme.hairline,
+                width: 1.2,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: isRunning ? const Color(0xFF10B981) : SlipTheme.steelLight,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      isRunning ? 'LOCAL SERVER RUNNING' : 'LOCAL SERVER STOPPED',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                        color: isRunning ? const Color(0xFF10B981) : SlipTheme.steel,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (_isLoading)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: SlipTheme.carbon),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'DESKTOP BRIDGE URL',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                    color: SlipTheme.steel,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: SlipTheme.canvas,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: SlipTheme.hairline),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SelectableText(
+                          isRunning ? serverUrl : 'http://--:8080',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w700,
+                            color: isRunning ? SlipTheme.carbon : SlipTheme.steelLight,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.copy_rounded, size: 20, color: SlipTheme.carbon),
+                        tooltip: 'Copy URL',
+                        onPressed: isRunning ? () => _copyUrl(serverUrl) : null,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _toggleServer,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isRunning ? SlipTheme.trapRed : SlipTheme.carbon,
+                          foregroundColor: SlipTheme.canvas,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: Text(
+                          isRunning ? 'STOP SERVER' : 'START SERVER',
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.5),
+                        ),
+                      ),
+                    ),
+                    if (isRunning) ...[
+                      const SizedBox(width: 10),
+                      IconButton.filledTonal(
+                        onPressed: () => NativeDeviceService.openUrl(serverUrl),
+                        icon: const Icon(Icons.open_in_browser_rounded, size: 20),
+                        tooltip: 'Test in browser',
+                        style: IconButton.styleFrom(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          padding: const EdgeInsets.all(14),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // 2. Instructions Guide
+          const Text(
+            'HOW TO CONNECT YOUR LAPTOP',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.8,
+              color: SlipTheme.steel,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _buildInstructionStep(
+            number: '1',
+            title: 'Same Wi-Fi or Hotspot',
+            description: 'Connect your laptop and phone to the same Wi-Fi, or turn on your phone hotspot and connect your laptop to it.',
+          ),
+          _buildInstructionStep(
+            number: '2',
+            title: 'Open URL on Laptop',
+            description: 'Open Chrome, Edge, Safari, or Firefox on your laptop and paste the URL shown above.',
+          ),
+          _buildInstructionStep(
+            number: '3',
+            title: 'Snip & Paste (Ctrl+V)',
+            description: 'Take a screenshot of any quiz question using Win+Shift+S (or Cmd+Shift+4) and paste it directly into the web page.',
+          ),
+          _buildInstructionStep(
+            number: '4',
+            title: 'Instant Local Sync',
+            description: 'Blunders logged from your laptop keyboard save immediately onto your phone database. Zero cloud costs, 100% free.',
+          ),
+          const SizedBox(height: 32),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInstructionStep({
+    required String number,
+    required String title,
+    required String description,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: SlipTheme.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: SlipTheme.hairline),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 26,
+            height: 26,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: SlipTheme.carbon,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              number,
+              style: const TextStyle(
+                color: SlipTheme.canvas,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: SlipTheme.carbon,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: SlipTheme.steel,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

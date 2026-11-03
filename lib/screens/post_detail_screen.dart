@@ -5,6 +5,7 @@ import '../models/slip.dart';
 import '../providers/slip_provider.dart';
 import '../theme/slip_theme.dart';
 import '../widgets/audio_waveform_strip.dart';
+import '../widgets/clickable_text.dart';
 import '../widgets/image_gallery_grid.dart';
 import 'profile_screen.dart';
 
@@ -465,10 +466,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                         letterSpacing: 0.5,
                       ),
                     ),
-                    const Text(
-                      'Reddit-style Threaded',
-                      style: TextStyle(fontSize: 10, color: SlipTheme.steel),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 14),
@@ -581,8 +578,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           const SizedBox(height: 8),
 
           // Comment Body Text
-          Text(
-            comment.body,
+          ClickableText(
+            text: comment.body,
             style: const TextStyle(
               fontSize: 13,
               height: 1.4,
@@ -676,8 +673,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             ],
           ),
           const SizedBox(height: 4),
-          Text(
-            reply.body,
+          ClickableText(
+            text: reply.body,
             style: const TextStyle(
               fontSize: 12.5,
               height: 1.35,

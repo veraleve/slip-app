@@ -20,6 +20,7 @@ class DropSlipScreen extends StatefulWidget {
 
 class _DropSlipScreenState extends State<DropSlipScreen> {
   PostType _activeMode = PostType.doubt;
+  bool _isGeneralDoubt = false;
 
   late String _selectedExam;
   late String _selectedSubject;
@@ -500,87 +501,134 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
 
               const SizedBox(height: 18),
 
-              // 2. Cascading Selector 2: Subject Dropdown
-              Text(
-                'SYLLABUS SUBJECT',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: SlipTheme.steel,
-                      letterSpacing: 0.6,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-                decoration: BoxDecoration(
-                  border: Border.all(color: SlipTheme.hairline, width: 0.8),
-                  borderRadius: BorderRadius.circular(16),
-                  color: SlipTheme.surface,
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedSubject,
-                    isExpanded: true,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: SlipTheme.carbon,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
+              // General Doubt Quick Chip (Bypasses Subject & Subtopic)
+              if (isDoubt) ...[
+                Row(
+                  children: [
+                    FilterChip(
+                      selected: _isGeneralDoubt,
+                      showCheckmark: true,
+                      checkmarkColor: _isGeneralDoubt ? SlipTheme.canvas : SlipTheme.carbon,
+                      selectedColor: SlipTheme.carbon,
+                      backgroundColor: SlipTheme.surface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(
+                          color: _isGeneralDoubt ? SlipTheme.carbon : SlipTheme.hairline,
+                          width: 0.8,
                         ),
-                    items: availableSubjects.map((subj) {
-                      return DropdownMenuItem(
-                        value: subj,
-                        child: Text(subj, overflow: TextOverflow.ellipsis),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) _onSubjectChanged(val);
-                    },
+                      ),
+                      label: Text(
+                        'General Doubt (No Subject)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: _isGeneralDoubt ? SlipTheme.canvas : SlipTheme.carbon,
+                        ),
+                      ),
+                      onSelected: (val) {
+                        setState(() {
+                          _isGeneralDoubt = val;
+                          if (val) {
+                            _selectedSubject = 'General';
+                            _selectedSubtopic = 'General';
+                          } else {
+                            final subjects = GateSyllabus.getSubjectsForExam(_selectedExam);
+                            _selectedSubject = subjects.first;
+                            final topics = GateSyllabus.getSubtopics(_selectedExam, _selectedSubject);
+                            _selectedSubtopic = topics.isNotEmpty ? topics.first : 'General';
+                          }
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+              ],
+
+              // 2. Cascading Selector 2: Subject Dropdown (hidden if General Doubt is active)
+              if (!_isGeneralDoubt) ...[
+                Text(
+                  'SYLLABUS SUBJECT',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: SlipTheme.steel,
+                        letterSpacing: 0.6,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: SlipTheme.hairline, width: 0.8),
+                    borderRadius: BorderRadius.circular(16),
+                    color: SlipTheme.surface,
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedSubject,
+                      isExpanded: true,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: SlipTheme.carbon,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                      items: availableSubjects.map((subj) {
+                        return DropdownMenuItem(
+                          value: subj,
+                          child: Text(subj, overflow: TextOverflow.ellipsis),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) _onSubjectChanged(val);
+                      },
+                    ),
                   ),
                 ),
-              ),
 
-              const SizedBox(height: 18),
+                const SizedBox(height: 18),
 
-              // 3. Cascading Selector 3: Topic Dropdown (Cascaded dynamically from Subject)
-              Text(
-                'SYLLABUS TOPIC',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: SlipTheme.steel,
-                      letterSpacing: 0.6,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-                decoration: BoxDecoration(
-                  border: Border.all(color: SlipTheme.hairline, width: 0.8),
-                  borderRadius: BorderRadius.circular(16),
-                  color: SlipTheme.surface,
+                // 3. Cascading Selector 3: Topic Dropdown (Cascaded dynamically from Subject)
+                Text(
+                  'SYLLABUS TOPIC',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: SlipTheme.steel,
+                        letterSpacing: 0.6,
+                      ),
                 ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedSubtopic,
-                    isExpanded: true,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: SlipTheme.carbon,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                    items: allSubtopicOptions.map((top) {
-                      return DropdownMenuItem(
-                        value: top,
-                        child: Text(top, overflow: TextOverflow.ellipsis),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) _onSubtopicChanged(val);
-                    },
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: SlipTheme.hairline, width: 0.8),
+                    borderRadius: BorderRadius.circular(16),
+                    color: SlipTheme.surface,
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedSubtopic,
+                      isExpanded: true,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: SlipTheme.carbon,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                      items: allSubtopicOptions.map((top) {
+                        return DropdownMenuItem(
+                          value: top,
+                          child: Text(top, overflow: TextOverflow.ellipsis),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) _onSubtopicChanged(val);
+                      },
+                    ),
                   ),
                 ),
-              ),
 
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
+              ],
 
               // 4. Form inputs based on Active Mode
               if (isDoubt) ...[
@@ -617,22 +665,6 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
                   maxLines: 4,
                 ),
                 const SizedBox(height: 18),
-
-                // Optional Answer / Working
-                Text(
-                  'YOUR WORKING / ATTEMPT (OPTIONAL)',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: SlipTheme.steel,
-                        letterSpacing: 0.6,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                HairlineInput(
-                  controller: _fixController,
-                  placeholder: 'Add what you tried or any formula you attempted...',
-                  maxLines: 3,
-                ),
               ] else ...[
                 // Mistake Trap
                 Row(

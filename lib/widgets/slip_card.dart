@@ -6,6 +6,7 @@ import '../screens/post_detail_screen.dart';
 import '../screens/profile_screen.dart';
 import '../theme/slip_theme.dart';
 import 'audio_waveform_strip.dart';
+import 'clickable_text.dart';
 import 'image_gallery_grid.dart';
 
 class SlipCard extends StatefulWidget {
@@ -270,8 +271,8 @@ class _SlipCardState extends State<SlipCard> {
                   ),
             ),
             const SizedBox(height: 6),
-            Text(
-              slip.trapStatement,
+            ClickableText(
+              text: slip.trapStatement,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: SlipTheme.carbon.withOpacity(0.85),
                     height: 1.45,
@@ -279,8 +280,8 @@ class _SlipCardState extends State<SlipCard> {
                   ),
             ),
           ] else ...[
-            Text(
-              slip.trapStatement,
+            ClickableText(
+              text: slip.trapStatement,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: SlipTheme.carbon,
@@ -335,8 +336,8 @@ class _SlipCardState extends State<SlipCard> {
                         ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    slip.fixStatement,
+                  ClickableText(
+                    text: slip.fixStatement,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: SlipTheme.carbon,
                           height: 1.45,

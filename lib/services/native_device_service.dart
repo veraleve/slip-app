@@ -129,4 +129,14 @@ class NativeDeviceService {
       return false;
     }
   }
+
+  // --- NATIVE URL BROWSER LAUNCHER ---
+  static Future<bool> openUrl(String url) async {
+    try {
+      final res = await _channel.invokeMethod<bool>('openUrl', {'url': url});
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
 }

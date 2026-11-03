@@ -24,23 +24,22 @@ class SupabaseService {
 
   Future<void> initialize() async {
     try {
-      if (AppConstants.supabaseAnonKey.isNotEmpty) {
-        _client = SupabaseClient(
-          AppConstants.supabaseUrl,
-          AppConstants.supabaseAnonKey,
-        );
-      }
-
-      // Restore cached session or generate stable anonymous peer session
+      // 1. Restore local preferences FIRST (guarantees offline & session reliability)
       final prefs = await SharedPreferences.getInstance();
-      _currentUsername = prefs.getString('slip_username');
-      _currentUserId = prefs.getString('slip_user_id');
       _isLoggedIn = prefs.getBool('slip_is_logged_in') ?? false;
       _rememberDevice = prefs.getBool('slip_remember_device') ?? true;
+      _currentUsername = prefs.getString('slip_username');
+      _currentUserId = prefs.getString('slip_user_id');
       _savedUsername = prefs.getString('slip_saved_username');
       _savedPassword = prefs.getString('slip_saved_password');
 
-      if (_currentUserId == null || !isUuid(_currentUserId!)) {
+      final savedExams = prefs.getStringList('slip_target_exams');
+      if (savedExams != null && savedExams.isNotEmpty) {
+        _targetExams = savedExams;
+      }
+
+      // Generate persistent ID only if missing (NEVER wipe non-UUID handles/mesh IDs)
+      if (_currentUserId == null || _currentUserId!.isEmpty) {
         _currentUserId = generateUuid();
         await prefs.setString('slip_user_id', _currentUserId!);
       }
@@ -51,17 +50,32 @@ class SupabaseService {
         await prefs.setString('slip_username', _currentUsername!);
       }
 
-      final savedExams = prefs.getStringList('slip_target_exams');
-      if (savedExams != null && savedExams.isNotEmpty) {
-        _targetExams = savedExams;
+      // 2. Initialize Supabase Client in safe isolated block
+      if (AppConstants.supabaseAnonKey.isNotEmpty) {
+        try {
+          _client = SupabaseClient(
+            AppConstants.supabaseUrl,
+            AppConstants.supabaseAnonKey,
+          );
+        } catch (e) {
+          debugPrint('Supabase client connection warning: $e');
+        }
       }
-    } catch (_) {
-      // Offline fallback
+    } catch (e) {
+      debugPrint('SupabaseService initialize error: $e');
     }
   }
 
   SupabaseClient? get client => _client;
-  bool get isAuthenticated => _isLoggedIn;
+
+  bool get isAuthenticated {
+    if (_isLoggedIn) return true;
+    if (_rememberDevice && _currentUsername != null && _currentUsername!.isNotEmpty) {
+      return true;
+    }
+    return false;
+  }
+
   bool get isLoggedIn => _isLoggedIn;
   bool get rememberDevice => _rememberDevice;
   String? get savedUsername => _savedUsername ?? _currentUsername;
@@ -96,16 +110,19 @@ class SupabaseService {
     }
   }
 
-  void updateTargetExams(List<String> exams) {
+  Future<void> updateTargetExams(List<String> exams) async {
     if (exams.isEmpty) return;
     _targetExams = List.from(exams);
-    SharedPreferences.getInstance().then((p) => p.setStringList('slip_target_exams', _targetExams));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('slip_target_exams', _targetExams);
 
     if (_client != null && _currentUserId != null) {
-      _client!.from('profiles').update({
-        'target_exams': _targetExams,
-        'target_exam': primaryExam,
-      }).eq('id', _currentUserId!).catchError((_) {});
+      try {
+        await _client!.from('profiles').update({
+          'target_exams': _targetExams,
+          'target_exam': primaryExam,
+        }).eq('id', _currentUserId!);
+      } catch (_) {}
     }
   }
 
@@ -262,6 +279,7 @@ class SupabaseService {
     await prefs.remove('slip_username');
     await prefs.remove('slip_user_id');
     await prefs.setBool('slip_is_logged_in', false);
+    await prefs.setBool('slip_remember_device', false);
     await prefs.remove('slip_saved_password');
 
     if (_client != null) {
