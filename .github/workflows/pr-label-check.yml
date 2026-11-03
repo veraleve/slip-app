@@ -1,0 +1,16 @@
+name: PR Label Enforcement
+
+on:
+  pull_request:
+    types: [opened, labeled, unlabeled, synchronize]
+
+jobs:
+  check_labels:
+    name: Verify Required PR Labels
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Labels
+        uses: docker://agilepathway/pull-request-label-checker:latest
+        with:
+          one_of: feat,fix,ui,slip-trap,docs,chore
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
