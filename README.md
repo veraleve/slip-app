@@ -185,3 +185,10 @@ The latest production APK (`slip.apk`) is published with every release on GitHub
    flutter test
    ```
 4. Submit a Pull Request targeting `main`. All PRs undergo automated CI verification.
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
