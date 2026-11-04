@@ -71,6 +71,14 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool get _allPermissionsGranted =>
       _permissions.values.isNotEmpty && _permissions.values.every((v) => v == true);
 
+  bool get isOwnProfile {
+    final currentUsername = (widget.provider.currentUsername ?? SupabaseService().currentUsername ?? '')
+        .toLowerCase()
+        .trim();
+    if (widget.targetUsername == null || widget.targetUsername!.isEmpty) return true;
+    return widget.targetUsername!.toLowerCase().trim() == currentUsername;
+  }
+
   String _profileSearchQuery = '';
   String? _profileSubjectFilter;
 

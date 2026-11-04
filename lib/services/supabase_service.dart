@@ -888,8 +888,6 @@ class SupabaseService {
   }
 
   // --- 5. TASKS / MOCK TEST REMINDER STORAGE (OFFLINE-FIRST) ---
-  String get _scopedTasksKey => 'slip_local_tasks_${_currentUsername ?? "guest"}';
-
   Future<List<String>> loadTasksRaw() async {
     try {
       final prefs = await SharedPreferences.getInstance();
