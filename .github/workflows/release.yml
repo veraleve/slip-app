@@ -68,13 +68,13 @@ jobs:
             ## Slip — Ask doubts. Learn from mistakes. Master together.
 
             ### What's New in ${{ steps.get_tag.outputs.TAG_NAME }}:
-            - **Reaction Micro-Animations & Haptics**: Scale-burst bounce on Solved checkmark, pop scale + floating overlay pill (`+1 Same doubt!`) on Same Doubt/Mistake, and Instagram-style pop animation on Save/Bookmark.
-            - **Same Doubt & Reaction Sync**: Same Doubt counters and user reactions sync to Supabase `slips` table and persist across app restarts and refreshes.
-            - **Discussion Threads & Comment Counters**: Visible comment count badges on feed cards and reactive comment counters in Post Detail discussions.
-            - **Password-Protected Desktop Bridge**: Embedded phone handle with account password verification for the local Wi-Fi Desktop Connect server.
-            - **Multi-Account User Data Isolation**: Scoped local blunders and mock test reminders per user handle so switching accounts never leaks private data; added password reset support.
-            - **Streamlined General Tagging**: Clean `[GENERAL]` badge for general doubts without subject clutter.
-            - **Permanent Release Keystore**: All updates install in-place seamlessly with zero data loss.
+            - **MIT Open-Source License**: Official open-source release with standard MIT licensing and updated contribution guides.
+            - **Security & Injection Lockdown**: Defeated PostgREST wildcard injection and null-account takeover in authentication and password reset; secured local desktop HTTP bridge with cryptographic token entropy and removed fallback bypasses.
+            - **Multi-Account Storage Isolation**: Completely scoped bookmarks, deletion filters, cached drafts, and custom revision task lists per user handle.
+            - **Native Android Hardware Bridge Fixes**: Fixed camera and microphone permission request delegation to prevent UI freezes, and switched remote audio playback to asynchronous preparation to avoid ANR crashes.
+            - **Data Integrity & Multi-Image Attachments**: Preserved all multi-image attachments locally and in cloud storage; preserved General Doubt tagging across cache deserialization.
+            - **Peer Access Control**: Protected peer blunder posts from unauthorized deletion or editing in profile views.
+            - **Swiss Design Polish**: Converted all boxy container and badge radii to Swiss curved pill standards (6-16px) and purged emoji artifacts from web server templates.
 
             **Direct Download:** `slip.apk`
           files: build/app/outputs/flutter-apk/slip.apk
