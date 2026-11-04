@@ -171,6 +171,25 @@ class _SlipCardState extends State<SlipCard> with TickerProviderStateMixin {
                             color: SlipTheme.carbon,
                           ),
                         ),
+                        if (isAuthor) ...[
+                          const SizedBox(width: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: SlipTheme.carbon,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'YOU',
+                              style: TextStyle(
+                                fontSize: 8,
+                                fontWeight: FontWeight.w800,
+                                color: SlipTheme.canvas,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

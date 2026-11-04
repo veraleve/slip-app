@@ -326,7 +326,7 @@ class MainActivity : FlutterActivity() {
                         android.graphics.BitmapFactory.decodeFile(file.absolutePath, options)
 
                         var sampleSize = 1
-                        val maxDim = 2048 // Full HD+ ensures formulas, superscripts and subscript letters are crisp
+                        val maxDim = 2560 // 2.5K QHD ensures handwriting, small indexes, and exponents remain sharp
                         while (options.outWidth / sampleSize > maxDim || options.outHeight / sampleSize > maxDim) {
                             sampleSize *= 2
                         }

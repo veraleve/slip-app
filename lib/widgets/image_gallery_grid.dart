@@ -71,7 +71,7 @@ class ImageGalleryGrid extends StatelessWidget {
 
   Widget _buildSingleImage(BuildContext context, String uri, int index) {
     return Container(
-      constraints: const BoxConstraints(maxHeight: 240),
+      constraints: const BoxConstraints(maxHeight: 280),
       width: double.infinity,
       color: SlipTheme.surface,
       child: _buildImageTile(context, uri, index, fit: BoxFit.contain),
@@ -80,11 +80,11 @@ class ImageGalleryGrid extends StatelessWidget {
 
   Widget _buildTwoImages(BuildContext context) {
     return SizedBox(
-      height: 160,
+      height: 190,
       child: Row(
         children: [
           Expanded(child: _buildImageTile(context, imageUris[0], 0)),
-          const SizedBox(width: 3),
+          const SizedBox(width: 4),
           Expanded(child: _buildImageTile(context, imageUris[1], 1)),
         ],
       ),
@@ -230,7 +230,7 @@ class _LightboxDialogState extends State<_LightboxDialog> {
                 final isLocal = !uri.startsWith('http');
                 return InteractiveViewer(
                   minScale: 0.8,
-                  maxScale: 4.0,
+                  maxScale: 6.0,
                   child: Center(
                     child: isLocal
                         ? Image.file(

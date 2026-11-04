@@ -787,6 +787,33 @@ class SupabaseService {
     var result = combinedMap.values.where((s) => !deletedIds.contains(s.id)).toList();
     result.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
+    // Content-based deduplication: if two posts have identical author and title/statement,
+    // merge them cleanly so duplicate cards never appear on screen
+    final Map<String, Slip> dedupedMap = {};
+    for (final slip in result) {
+      final authorKey = (slip.authorUsername ?? '').trim().toLowerCase();
+      final titleKey = (slip.title ?? '').trim().toLowerCase();
+      final trapKey = slip.trapStatement.trim().toLowerCase();
+      final compositeKey = (authorKey.isNotEmpty && (titleKey.isNotEmpty || trapKey.isNotEmpty))
+          ? '$authorKey|${titleKey.isNotEmpty ? titleKey : trapKey}'
+          : slip.id;
+
+      if (!dedupedMap.containsKey(compositeKey)) {
+        dedupedMap[compositeKey] = slip;
+      } else {
+        final existing = dedupedMap[compositeKey]!;
+        // Prefer the version with cloud HTTPS images or higher comment count
+        final existingHasCloud = existing.imageUris.any((u) => u.startsWith('http'));
+        final currentHasCloud = slip.imageUris.any((u) => u.startsWith('http'));
+        if (!existingHasCloud && currentHasCloud) {
+          dedupedMap[compositeKey] = slip;
+        } else if (slip.commentsCount > existing.commentsCount) {
+          dedupedMap[compositeKey] = slip;
+        }
+      }
+    }
+    result = dedupedMap.values.toList();
+
     // Flexible Paper Filter using normalization so peer doubts are never lost
     if (allowedPapers.isNotEmpty && !allowedPapers.contains('All')) {
       final normSet = allowedPapers.map(GateSyllabus.normalizeExam).toSet();
@@ -1163,6 +1190,16 @@ class SupabaseService {
           for (final item in list) {
             final m = item as Map<String, dynamic>;
             combined[m['id'].toString()] = m;
+          }
+        }
+
+        // Auto-sync any local comments to Supabase cloud if not yet present
+        for (final localComment in persistent) {
+          final cid = localComment['id']?.toString();
+          if (cid != null && !list.any((r) => r['id']?.toString() == cid)) {
+            try {
+              await _client!.from('slip_comments').upsert(localComment);
+            } catch (_) {}
           }
         }
       } catch (e) {

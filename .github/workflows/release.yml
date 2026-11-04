@@ -41,9 +41,14 @@ jobs:
 
       - name: Build APK (Release)
         run: |
-          PROD_URL="https://grydnpgufybxvmovdumg.supabase.co"
-          PROD_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdyeWRucGd1ZnlieHZtb3ZkdW1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM2NTkyMDMsImV4cCI6MjEwOTIzNTIwM30.OM2lsAooaLbkmG0GRAkgH2_s-yJKlgxniLCe_1g_OzQ"
-          flutter build apk --release --no-shrink --dart-define=SUPABASE_URL=$PROD_URL --dart-define=SUPABASE_ANON_KEY=$PROD_KEY
+          DART_DEFINES=""
+          if [ -n "${{ secrets.SUPABASE_URL }}" ]; then
+            DART_DEFINES="$DART_DEFINES --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }}"
+          fi
+          if [ -n "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
+            DART_DEFINES="$DART_DEFINES --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}"
+          fi
+          flutter build apk --release --no-shrink $DART_DEFINES
           cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/slip.apk
 
       - name: Determine Tag
@@ -70,11 +75,11 @@ jobs:
             ## Slip — Ask doubts. Learn from mistakes. Master together.
 
             ### What's New in ${{ steps.get_tag.outputs.TAG_NAME }}:
-            - **Modular Desktop Workspace Architecture**: Refactored Desktop Bridge into dedicated modular components (Auth, Feed, Comments, Tasks, Web UI) for superior maintainability and performance.
-            - **Expanded Desktop Portal**: Full-featured laptop experience with live Peer Feed browsing, search filter, answer submission, accepted solution marking, and study revision task management.
-            - **GATE Paper Cloud & DB Synchronization**: Multi-exam target selection (CS, DA, EC, ME) now persists dynamically to user profiles in the database and synchronizes peer doubts instantaneously.
-            - **Feed Refresh Retention**: Resolved exam filter collisions and duplicate scope declarations; guaranteed authored doubts and blunders remain permanent on refresh.
-            - **Production Secret Fallback**: Robust runtime getters ensure continuous cloud connectivity across offline and online environments.
+            - **Author Identification Badge**: Cards now prominently display a 'YOU' badge next to the author's handle for all self-authored doubts and blunders.
+            - **Intelligent Feed Content Deduplication**: Automated client-side content deduplication merges local device cache with remote cloud records, guaranteeing no duplicate cards.
+            - **Offline Comment Synchronization**: Comments drafted offline automatically persist and upload to Supabase as soon as network connectivity is restored.
+            - **High-Definition Handwriting & Diagram Capture**: Native Android camera capture upgraded to 2.5K QHD (2560px) with 6.0x deep pinch-to-zoom in lightbox view.
+            - **Open-Source Secrets Security**: Build pipeline directly leverages repository GitHub Secrets for Supabase configuration.
 
             **Direct Download:** `slip.apk`
           files: build/app/outputs/flutter-apk/slip.apk
