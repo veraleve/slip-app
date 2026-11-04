@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../constants/gate_syllabus.dart';
 import '../models/slip.dart';
 import '../models/task_item.dart';
 import '../services/supabase_service.dart';
