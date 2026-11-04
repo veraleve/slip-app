@@ -26,6 +26,7 @@ class Slip {
   final int sameCount;
   final int clearedCount;
   final int keepCount;
+  final int commentsCount;
   final DateTime createdAt;
 
   // Local interaction states
@@ -56,6 +57,7 @@ class Slip {
     this.sameCount = 0,
     this.clearedCount = 0,
     this.keepCount = 0,
+    this.commentsCount = 0,
     required this.createdAt,
     this.hasSaidSame = false,
     this.hasKept = false,
@@ -106,6 +108,7 @@ class Slip {
       sameCount: json['same_count'] as int? ?? 0,
       clearedCount: json['cleared_count'] as int? ?? 0,
       keepCount: json['keep_count'] as int? ?? 0,
+      commentsCount: json['comments_count'] as int? ?? 0,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'] as String) ?? DateTime.now()
           : DateTime.now(),
@@ -135,6 +138,7 @@ class Slip {
       'same_count': sameCount,
       'cleared_count': clearedCount,
       'keep_count': keepCount,
+      'comments_count': commentsCount,
       'created_at': createdAt.toIso8601String(),
       'allow_comments': allowComments,
     };
@@ -161,6 +165,7 @@ class Slip {
     int? sameCount,
     int? clearedCount,
     int? keepCount,
+    int? commentsCount,
     DateTime? createdAt,
     bool? hasSaidSame,
     bool? hasKept,
@@ -189,6 +194,7 @@ class Slip {
       sameCount: sameCount ?? this.sameCount,
       clearedCount: clearedCount ?? this.clearedCount,
       keepCount: keepCount ?? this.keepCount,
+      commentsCount: commentsCount ?? this.commentsCount,
       createdAt: createdAt ?? this.createdAt,
       hasSaidSame: hasSaidSame ?? this.hasSaidSame,
       hasKept: hasKept ?? this.hasKept,

@@ -316,13 +316,15 @@ class SlipProvider extends ChangeNotifier {
     final current = _slips[index];
     final newState = !current.hasSaidSame;
     final newCount = newState ? current.sameCount + 1 : current.sameCount - 1;
+    final safeCount = newCount < 0 ? 0 : newCount;
 
     _slips[index] = current.copyWith(
       hasSaidSame: newState,
-      sameCount: newCount < 0 ? 0 : newCount,
+      sameCount: safeCount,
     );
     notifyListeners();
 
+    _service.updateSlipSameCount(slipId, safeCount, hasSaidSame: newState);
     if (newState) {
       _service.recordInteraction(slipId: slipId, interactionType: 'same');
     }
@@ -490,6 +492,14 @@ class SlipProvider extends ChangeNotifier {
       body: body,
       parentId: parentId,
     );
+    if (success) {
+      final index = _slips.indexWhere((s) => s.id == slipId);
+      if (index != -1) {
+        _slips[index] = _slips[index].copyWith(
+          commentsCount: _slips[index].commentsCount + 1,
+        );
+      }
+    }
     notifyListeners();
     return success;
   }

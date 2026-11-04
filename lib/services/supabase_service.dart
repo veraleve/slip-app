@@ -258,6 +258,34 @@ class SupabaseService {
     return true;
   }
 
+  Future<bool> resetPasswordWithUsername({
+    required String username,
+    required String newPassword,
+  }) async {
+    final cleanUsername = username.trim();
+    final cleanPassword = newPassword.trim();
+    if (cleanUsername.isEmpty || cleanPassword.length < 6) return false;
+
+    if (_client != null) {
+      try {
+        final res = await _client!
+            .from('profiles')
+            .update({'password_hash': cleanPassword})
+            .ilike('handle', cleanUsername)
+            .select();
+        if ((res as List).isNotEmpty) {
+          _savedPassword = cleanPassword;
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('slip_saved_password', cleanPassword);
+          return true;
+        }
+      } catch (e) {
+        debugPrint('Reset password error: $e');
+      }
+    }
+    return false;
+  }
+
   Future<void> _persistSession(String username, String userId, List<String> exams) async {
     _currentUsername = username;
     _currentUserId = userId;
@@ -303,10 +331,13 @@ class SupabaseService {
   }
 
   // --- LOCAL-FIRST OFFLINE STORAGE & DELTA SYNC ---
+  String get _scopedUserSlipsKey => 'slip_local_user_slips_${_currentUsername ?? "guest"}';
+  String get _scopedSameIdsKey => 'slip_same_ids_${_currentUsername ?? "guest"}';
+
   Future<List<Slip>> loadLocalUserSlips() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final rawList = prefs.getStringList('slip_local_user_slips') ?? [];
+      final rawList = prefs.getStringList(_scopedUserSlipsKey) ?? prefs.getStringList('slip_local_user_slips') ?? [];
       return rawList.map((str) => Slip.fromJson(jsonDecode(str) as Map<String, dynamic>)).toList();
     } catch (_) {
       return [];
@@ -316,10 +347,51 @@ class SupabaseService {
   Future<void> saveLocalUserSlips(List<Slip> slips) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final userSlips = slips.where((s) => s.authorId != null && s.authorId == _currentUserId).toList();
+      final userSlips = slips.where((s) => (s.authorId != null && s.authorId == _currentUserId) || (s.authorUsername != null && s.authorUsername == _currentUsername)).toList();
       final List<String> rawList = userSlips.map((s) => jsonEncode(s.toJson())).toList();
-      await prefs.setStringList('slip_local_user_slips', rawList);
+      await prefs.setStringList(_scopedUserSlipsKey, rawList);
     } catch (_) {}
+  }
+
+  Future<void> updateSlipSameCount(String slipId, int count, {required bool hasSaidSame}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final set = (prefs.getStringList(_scopedSameIdsKey) ?? []).toSet();
+      if (hasSaidSame) {
+        set.add(slipId);
+      } else {
+        set.remove(slipId);
+      }
+      await prefs.setStringList(_scopedSameIdsKey, set.toList());
+
+      if (_client != null) {
+        try {
+          await _client!.from('slips').update({'same_count': count}).eq('id', slipId);
+        } catch (e) {
+          debugPrint('Update slip same_count in Supabase error: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('updateSlipSameCount error: $e');
+    }
+  }
+
+  Future<Map<String, int>> fetchCommentCounts() async {
+    final Map<String, int> counts = {};
+    if (_client != null) {
+      try {
+        final res = await _client!.from('slip_comments').select('slip_id');
+        for (final item in (res as List)) {
+          final sid = item['slip_id']?.toString();
+          if (sid != null) {
+            counts[sid] = (counts[sid] ?? 0) + 1;
+          }
+        }
+      } catch (e) {
+        debugPrint('fetchCommentCounts error: $e');
+      }
+    }
+    return counts;
   }
 
   Future<List<Slip>> loadSavedPeerSlips() async {
@@ -411,6 +483,8 @@ class SupabaseService {
     final savedIds = await getSavedSlipIds();
     final prefs = await SharedPreferences.getInstance();
     final deletedIds = (prefs.getStringList('slip_deleted_ids') ?? []).toSet();
+    final sameIds = (prefs.getStringList(_scopedSameIdsKey) ?? []).toSet();
+    final commentCounts = await fetchCommentCounts();
 
     final Map<String, Slip> combinedMap = {};
     for (final s in cachedFeed) {
@@ -423,11 +497,14 @@ class SupabaseService {
       combinedMap[s.id] = s;
     }
 
-    // Ensure saved state is accurately reflected
+    // Ensure saved state, reaction state, and comment count are accurately reflected
     for (final entry in combinedMap.entries) {
-      if (savedIds.contains(entry.key)) {
-        combinedMap[entry.key] = entry.value.copyWith(hasKept: true);
-      }
+      final s = entry.value;
+      combinedMap[entry.key] = s.copyWith(
+        hasKept: savedIds.contains(s.id),
+        hasSaidSame: sameIds.contains(s.id),
+        commentsCount: commentCounts[s.id] ?? s.commentsCount,
+      );
     }
 
     // 2. Fetch fresh records from Supabase cloud
@@ -443,7 +520,11 @@ class SupabaseService {
         if (list.isNotEmpty) {
           for (final item in list) {
             final slip = Slip.fromJson(item as Map<String, dynamic>);
-            combinedMap[slip.id] = slip.copyWith(hasKept: savedIds.contains(slip.id));
+            combinedMap[slip.id] = slip.copyWith(
+              hasKept: savedIds.contains(slip.id),
+              hasSaidSame: sameIds.contains(slip.id),
+              commentsCount: commentCounts[slip.id] ?? slip.commentsCount,
+            );
           }
 
           // Cache the updated feed for instant offline access
@@ -462,7 +543,11 @@ class SupabaseService {
                 .order('created_at', ascending: false);
             for (final item in (userPosts as List)) {
               final s = Slip.fromJson(item as Map<String, dynamic>);
-              combinedMap[s.id] = s.copyWith(hasKept: savedIds.contains(s.id));
+              combinedMap[s.id] = s.copyWith(
+                hasKept: savedIds.contains(s.id),
+                hasSaidSame: sameIds.contains(s.id),
+                commentsCount: commentCounts[s.id] ?? s.commentsCount,
+              );
             }
           } catch (_) {}
         }
@@ -768,10 +853,12 @@ class SupabaseService {
   }
 
   // --- 5. TASKS / MOCK TEST REMINDER STORAGE (OFFLINE-FIRST) ---
+  String get _scopedTasksKey => 'slip_local_tasks_${_currentUsername ?? "guest"}';
+
   Future<List<String>> loadTasksRaw() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.getStringList('slip_local_tasks') ?? [];
+      return prefs.getStringList(_scopedTasksKey) ?? prefs.getStringList('slip_local_tasks') ?? [];
     } catch (_) {
       return [];
     }
@@ -780,7 +867,7 @@ class SupabaseService {
   Future<void> saveTasksRaw(List<String> rawTasks) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList('slip_local_tasks', rawTasks);
+      await prefs.setStringList(_scopedTasksKey, rawTasks);
     } catch (_) {}
   }
 
@@ -825,8 +912,19 @@ class SupabaseService {
 
     if (_client != null) {
       try {
+        // Ensure slip exists in Supabase so foreign key doesn't fail
+        final slipCheck = await _client!.from('slips').select('id').eq('id', slipId).limit(1);
+        if ((slipCheck as List).isEmpty) {
+          final localSlips = await loadLocalUserSlips();
+          final matching = localSlips.where((s) => s.id == slipId).firstOrNull;
+          if (matching != null) {
+            await dropSlip(matching);
+          }
+        }
         await _client!.from('slip_comments').insert(comment);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('postComment error: $e');
+      }
     }
     return true;
   }

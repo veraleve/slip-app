@@ -67,16 +67,14 @@ jobs:
           body: |
             ## Slip — Ask doubts. Learn from mistakes. Master together.
 
-            ### What's New in v0.1.9:
-            - Permanent Release Keystore: Integrated permanent cryptographic signing key into the build pipeline. All future in-app updates will install seamlessly in-place just like the Google Play Store with zero package signature conflicts and zero data loss.
-            - Desktop Connect Web Bridge: Built-in local HTTP server (port 8080) to connect your laptop over Wi-Fi/Hotspot. Log test blunders and paste question screenshots with Ctrl+V with zero cloud fees.
-            - In-Text Clickable Links: Auto-detects http:// and https:// URLs across doubts, blunders, and comments, opening them natively in your browser.
-            - General Doubt Quick Chip: Ask doubts without mandatory syllabus subject tagging; simplifies doubt input form.
-            - Auto-Login & Session Persistence: Fixed app reopen prompt—sessions now persist reliably through device reboots and restarts.
-            - Settings Exam Papers Persistence: Target exam papers selection in Settings now saves immediately to local preferences.
-            - Post 3-Dot Overflow Menu: Replaced separate edit/delete icons with a clean 3-dot dropdown popup menu.
-            - Feed My Mistakes Tab Fix: Fixed mistake visibility filtering so local blunders remain visible across app restarts.
-            - Polished Google Tasks Layout: Removed boxed card layout, seamless canvas rendering, and optimized floating action button positioning.
+            ### What's New in ${{ steps.get_tag.outputs.TAG_NAME }}:
+            - **Reaction Micro-Animations & Haptics**: Scale-burst bounce on Solved checkmark, pop scale + floating overlay pill (`+1 Same doubt!`) on Same Doubt/Mistake, and Instagram-style pop animation on Save/Bookmark.
+            - **Same Doubt & Reaction Sync**: Same Doubt counters and user reactions sync to Supabase `slips` table and persist across app restarts and refreshes.
+            - **Discussion Threads & Comment Counters**: Visible comment count badges on feed cards and reactive comment counters in Post Detail discussions.
+            - **Password-Protected Desktop Bridge**: Embedded phone handle with account password verification for the local Wi-Fi Desktop Connect server.
+            - **Multi-Account User Data Isolation**: Scoped local blunders and mock test reminders per user handle so switching accounts never leaks private data; added password reset support.
+            - **Streamlined General Tagging**: Clean `[GENERAL]` badge for general doubts without subject clutter.
+            - **Permanent Release Keystore**: All updates install in-place seamlessly with zero data loss.
 
             **Direct Download:** `slip.apk`
           files: build/app/outputs/flutter-apk/slip.apk

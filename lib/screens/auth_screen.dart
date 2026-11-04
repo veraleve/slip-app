@@ -159,6 +159,43 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  Future<void> _handleResetPassword() async {
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text.trim();
+    if (username.isEmpty) {
+      setState(() => _errorMessage = 'ENTER YOUR USERNAME FIRST.');
+      return;
+    }
+    if (password.length < 6) {
+      setState(() => _errorMessage = 'ENTER NEW PASSWORD (MIN 6 CHARACTERS).');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final service = SupabaseService();
+    final success = await service.resetPasswordWithUsername(
+      username: username,
+      newPassword: password,
+    );
+    setState(() => _isLoading = false);
+
+    if (success) {
+      await service.setLoggedIn(
+        true,
+        rememberDevice: _rememberDevice,
+        username: username,
+        password: password,
+      );
+      widget.onAuthenticated();
+    } else {
+      setState(() => _errorMessage = 'COULD NOT RESET PASSWORD FOR USERNAME.');
+    }
+  }
+
   void _promptMeshConfirmation() {
     showDialog(
       context: context,
@@ -418,6 +455,40 @@ class _AuthScreenState extends State<AuthScreen> {
                             fontWeight: FontWeight.w600,
                           ),
                     ),
+                    if (_errorMessage == 'USERNAME ALREADY REGISTERED. PLEASE SIGN IN.') ...[
+                      const SizedBox(height: 6),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _isSignUp = false;
+                            _errorMessage = null;
+                          });
+                        },
+                        child: const Text(
+                          'Switch to Sign In →',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: SlipTheme.carbon,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ] else if (_errorMessage == 'INVALID USERNAME OR PASSWORD.') ...[
+                      const SizedBox(height: 6),
+                      GestureDetector(
+                        onTap: _handleResetPassword,
+                        child: const Text(
+                          'Forgot password? Tap to reset with this entry →',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: SlipTheme.carbon,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
 
                   const SizedBox(height: 18),

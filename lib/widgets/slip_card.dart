@@ -197,7 +197,7 @@ class _SlipCardState extends State<SlipCard> with TickerProviderStateMixin {
                         borderRadius: BorderRadius.circular(2),
                       ),
                       child: Text(
-                        isGeneralDoubt ? 'GENERAL DOUBT' : 'DOUBT',
+                        isGeneralDoubt ? 'GENERAL' : 'DOUBT',
                         style: const TextStyle(
                           fontSize: 7.5,
                           fontWeight: FontWeight.w800,
@@ -303,42 +303,6 @@ class _SlipCardState extends State<SlipCard> with TickerProviderStateMixin {
                             ),
                       ),
                     ),
-                  if (isAuthor) ...[
-                    const SizedBox(width: 4),
-                    PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_horiz_rounded, size: 18, color: SlipTheme.steel),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      elevation: 3,
-                      color: SlipTheme.canvas,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      onSelected: (val) {
-                        if (val == 'delete') {
-                          _confirmDelete(context);
-                        }
-                      },
-                      itemBuilder: (ctx) => [
-                        const PopupMenuItem(
-                          value: 'delete',
-                          height: 36,
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete_outline_rounded, size: 16, color: SlipTheme.trapRed),
-                              SizedBox(width: 8),
-                              Text(
-                                'Delete Post',
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: SlipTheme.trapRed,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
                 ],
               ),
             ],
@@ -534,12 +498,28 @@ class _SlipCardState extends State<SlipCard> with TickerProviderStateMixin {
                   InkWell(
                     onTap: () => _openPostDetail(context),
                     borderRadius: BorderRadius.circular(14),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 4, horizontal: 6),
-                      child: Icon(
-                        Icons.chat_bubble_outline_rounded,
-                        size: 18,
-                        color: SlipTheme.steel,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.chat_bubble_outline_rounded,
+                            size: 18,
+                            color: SlipTheme.steel,
+                          ),
+                          if (slip.commentsCount > 0) ...[
+                            const SizedBox(width: 4),
+                            Text(
+                              '${slip.commentsCount}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: SlipTheme.steel,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ),

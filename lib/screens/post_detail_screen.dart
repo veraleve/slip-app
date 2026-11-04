@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/comment.dart';
 import '../models/slip.dart';
@@ -23,7 +24,7 @@ class PostDetailScreen extends StatefulWidget {
   State<PostDetailScreen> createState() => _PostDetailScreenState();
 }
 
-class _PostDetailScreenState extends State<PostDetailScreen> {
+class _PostDetailScreenState extends State<PostDetailScreen> with TickerProviderStateMixin {
   final TextEditingController _commentController = TextEditingController();
   final FocusNode _commentFocusNode = FocusNode();
 
@@ -35,15 +36,51 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   SlipComment? _replyingToComment;
   bool _isSolutionRevealed = false;
 
+  late AnimationController _saveController;
+  late Animation<double> _saveAnimation;
+  late AnimationController _sameController;
+  late Animation<double> _sameAnimation;
+  late AnimationController _solveController;
+  late Animation<double> _solveAnimation;
+  bool _showSameOverlay = false;
+
   @override
   void initState() {
     super.initState();
     _isSolutionRevealed = widget.slip.isFixRevealed;
+    widget.provider.addListener(_onProviderUpdated);
+
+    _saveController = AnimationController(vsync: this, duration: const Duration(milliseconds: 250));
+    _saveAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.4).chain(CurveTween(curve: Curves.easeOutCubic)), weight: 50),
+      TweenSequenceItem(tween: Tween(begin: 1.4, end: 1.0).chain(CurveTween(curve: Curves.easeInCubic)), weight: 50),
+    ]).animate(_saveController);
+
+    _sameController = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
+    _sameAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.3).chain(CurveTween(curve: Curves.easeOutBack)), weight: 45),
+      TweenSequenceItem(tween: Tween(begin: 1.3, end: 1.0).chain(CurveTween(curve: Curves.easeInQuad)), weight: 55),
+    ]).animate(_sameController);
+
+    _solveController = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
+    _solveAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.35).chain(CurveTween(curve: Curves.easeOutBack)), weight: 50),
+      TweenSequenceItem(tween: Tween(begin: 1.35, end: 1.0).chain(CurveTween(curve: Curves.easeInQuad)), weight: 50),
+    ]).animate(_solveController);
+
     _loadComments();
+  }
+
+  void _onProviderUpdated() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    widget.provider.removeListener(_onProviderUpdated);
+    _saveController.dispose();
+    _sameController.dispose();
+    _solveController.dispose();
     _commentController.dispose();
     _commentFocusNode.dispose();
     super.dispose();
@@ -107,7 +144,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final slip = widget.slip;
+    final slip = widget.provider.allSlips.firstWhere(
+      (s) => s.id == widget.slip.id,
+      orElse: () => widget.slip,
+    );
     final isDoubt = slip.postType == PostType.doubt;
 
     // Separate top-level comments and map child replies
@@ -139,13 +179,20 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(
-              slip.hasKept ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-              color: slip.hasKept ? SlipTheme.carbon : SlipTheme.steel,
-              size: 22,
+            icon: ScaleTransition(
+              scale: _saveAnimation,
+              child: Icon(
+                slip.hasKept ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                color: slip.hasKept ? SlipTheme.carbon : SlipTheme.steel,
+                size: 22,
+              ),
             ),
             tooltip: 'Save to revision',
-            onPressed: () => widget.provider.toggleKeep(slip.id),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              _saveController.forward(from: 0.0);
+              widget.provider.toggleKeep(slip.id);
+            },
           ),
         ],
         bottom: const PreferredSize(
@@ -382,68 +429,119 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   const SizedBox(height: 14),
                 ],
 
-                // 7. Post Action Bar (Same, Cleared/Mastered)
+                // 7. Post Action Bar (Same, Cleared/Mastered) with Micro-Animations & Haptics
                 Row(
                   children: [
-                    InkWell(
-                      borderRadius: BorderRadius.circular(20),
-                      onTap: () => widget.provider.toggleSame(slip.id),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: slip.hasSaidSame ? SlipTheme.carbon : const Color(0xFFF3F4F6),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.help_outline_rounded,
-                              size: 14,
-                              color: slip.hasSaidSame ? SlipTheme.canvas : SlipTheme.carbon,
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              'Same Doubt (${slip.sameCount})',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: slip.hasSaidSame ? SlipTheme.canvas : SlipTheme.carbon,
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        ScaleTransition(
+                          scale: _sameAnimation,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              _sameController.forward(from: 0.0);
+                              if (!slip.hasSaidSame) {
+                                setState(() => _showSameOverlay = true);
+                                Future.delayed(const Duration(milliseconds: 1400), () {
+                                  if (mounted) setState(() => _showSameOverlay = false);
+                                });
+                              }
+                              widget.provider.toggleSame(slip.id);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: slip.hasSaidSame ? SlipTheme.carbon : const Color(0xFFF3F4F6),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    isDoubt ? Icons.help_outline_rounded : Icons.warning_amber_rounded,
+                                    size: 14,
+                                    color: slip.hasSaidSame ? SlipTheme.canvas : SlipTheme.carbon,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    '${isDoubt ? "Same Doubt" : "Same Mistake"} (${slip.sameCount})',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: slip.hasSaidSame ? SlipTheme.canvas : SlipTheme.carbon,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
+                          ),
                         ),
-                      ),
+                        if (_showSameOverlay)
+                          Positioned(
+                            top: -26,
+                            left: 0,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: SlipTheme.carbon,
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: const [
+                                    BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))
+                                  ],
+                                ),
+                                child: Text(
+                                  isDoubt ? '+1 Same doubt!' : '+1 Me too!',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(width: 8),
                     if (isDoubt)
-                      InkWell(
-                        borderRadius: BorderRadius.circular(20),
-                        onTap: () => widget.provider.toggleDoubtResolved(slip.id),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: slip.isResolved ? const Color(0xFFDCFCE7) : const Color(0xFFF3F4F6),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                slip.isResolved ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                                size: 14,
-                                color: slip.isResolved ? const Color(0xFF16A34A) : SlipTheme.steel,
-                              ),
-                              const SizedBox(width: 5),
-                              Text(
-                                slip.isResolved ? 'Resolved' : 'Mark Resolved',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: slip.isResolved ? const Color(0xFF16A34A) : SlipTheme.carbon,
+                      ScaleTransition(
+                        scale: _solveAnimation,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(20),
+                          onTap: () {
+                            HapticFeedback.mediumImpact();
+                            _solveController.forward(from: 0.0);
+                            widget.provider.toggleDoubtResolved(slip.id);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: slip.isResolved ? const Color(0xFFDCFCE7) : const Color(0xFFF3F4F6),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  slip.isResolved ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                                  size: 14,
+                                  color: slip.isResolved ? const Color(0xFF16A34A) : SlipTheme.steel,
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 5),
+                                Text(
+                                  slip.isResolved ? 'Resolved' : 'Mark Resolved',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: slip.isResolved ? const Color(0xFF16A34A) : SlipTheme.carbon,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),

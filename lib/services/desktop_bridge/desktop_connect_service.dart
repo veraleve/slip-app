@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import '../../constants/app_constants.dart';
@@ -19,6 +20,7 @@ class DesktopConnectService {
   String? _localIp;
   int _port = 8080;
   SlipProvider? _provider;
+  String _sessionToken = 'slip_token_initial';
 
   bool get isRunning => _server != null;
   String? get serverUrl => isRunning && _localIp != null ? 'http://$_localIp:$_port' : null;
@@ -59,6 +61,7 @@ class DesktopConnectService {
 
     _provider = provider;
     _port = port;
+    _sessionToken = 'slip_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(999999)}';
     await getDeviceIp();
 
     try {
@@ -87,7 +90,7 @@ class DesktopConnectService {
     // Add CORS headers for web requests
     request.response.headers.add('Access-Control-Allow-Origin', '*');
     request.response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    request.response.headers.add('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept');
+    request.response.headers.add('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Authorization');
 
     if (request.method == 'OPTIONS') {
       request.response.statusCode = HttpStatus.ok;
@@ -107,10 +110,13 @@ class DesktopConnectService {
         'exams': service.targetExams,
         'supportedExams': GateSyllabus.supportedExams,
         'version': AppConstants.appVersion,
+        'requiresAuth': true,
       };
       request.response.headers.contentType = ContentType.json;
       request.response.write(jsonEncode(data));
       await request.response.close();
+    } else if (request.method == 'POST' && path == '/api/auth') {
+      await _handleAuth(request);
     } else if (request.method == 'POST' && path == '/api/slips') {
       await _handlePostSlip(request);
     } else {
@@ -120,10 +126,80 @@ class DesktopConnectService {
     }
   }
 
+  Future<void> _handleAuth(HttpRequest request) async {
+    try {
+      final bodyStr = await utf8.decodeStream(request);
+      final Map<String, dynamic> data = jsonDecode(bodyStr);
+      final submittedPass = (data['password'] as String? ?? '').trim();
+
+      final service = SupabaseService();
+      final currentPass = service.savedPassword?.trim();
+
+      bool isValid = false;
+      if (currentPass != null && currentPass.isNotEmpty) {
+        isValid = (submittedPass == currentPass);
+      } else {
+        // Fallback: check Supabase profile
+        if (service.client != null && service.currentUsername != null) {
+          final res = await service.client!
+              .from('profiles')
+              .select('password_hash')
+              .ilike('handle', service.currentUsername!)
+              .limit(1);
+          if ((res as List).isNotEmpty) {
+            final hash = (res.first['password_hash'] as String? ?? '').trim();
+            if (hash.isEmpty || hash == submittedPass) {
+              isValid = true;
+            }
+          } else {
+            isValid = true;
+          }
+        } else {
+          isValid = true;
+        }
+      }
+
+      request.response.headers.contentType = ContentType.json;
+      if (isValid) {
+        request.response.statusCode = HttpStatus.ok;
+        request.response.write(jsonEncode({
+          'success': true,
+          'token': _sessionToken,
+          'username': service.currentUsername ?? 'peer',
+        }));
+      } else {
+        request.response.statusCode = HttpStatus.unauthorized;
+        request.response.write(jsonEncode({
+          'success': false,
+          'error': 'Incorrect account password for @${service.currentUsername ?? "user"}.',
+        }));
+      }
+      await request.response.close();
+    } catch (e) {
+      request.response.statusCode = HttpStatus.internalServerError;
+      request.response.headers.contentType = ContentType.json;
+      request.response.write(jsonEncode({'error': e.toString()}));
+      await request.response.close();
+    }
+  }
+
   Future<void> _handlePostSlip(HttpRequest request) async {
     try {
       final bodyStr = await utf8.decodeStream(request);
       final Map<String, dynamic> data = jsonDecode(bodyStr);
+
+      final authHeader = request.headers.value('Authorization');
+      final reqToken = (authHeader != null && authHeader.startsWith('Bearer '))
+          ? authHeader.substring(7).trim()
+          : (data['token'] as String? ?? '').trim();
+
+      if (reqToken != _sessionToken) {
+        request.response.statusCode = HttpStatus.unauthorized;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(jsonEncode({'error': 'Unauthorized. Please authenticate desktop session.'}));
+        await request.response.close();
+        return;
+      }
 
       final title = data['title'] as String? ?? '';
       final trap = data['trapStatement'] as String? ?? '';
@@ -180,9 +256,10 @@ class DesktopConnectService {
       }));
       await request.response.close();
     } catch (e) {
+      debugPrint('Error handling desktop slip post: $e');
       request.response.statusCode = HttpStatus.internalServerError;
       request.response.headers.contentType = ContentType.json;
-      request.response.write(jsonEncode({'error': e.toString()}));
+      request.response.write(jsonEncode({'error': 'Internal server error: $e'}));
       await request.response.close();
     }
   }
@@ -227,6 +304,7 @@ class DesktopConnectService {
       border: 1px solid var(--hairline);
       box-shadow: 0 4px 20px rgba(0,0,0,0.04);
       padding: 32px;
+      position: relative;
     }
     .header {
       display: flex;
@@ -250,6 +328,27 @@ class DesktopConnectService {
       padding: 6px 12px; border-radius: 20px; border: 1px solid rgba(46,125,50,0.2);
     }
     .status-dot { width: 7px; height: 7px; background: var(--clearedGreen); border-radius: 50%; }
+
+    /* Auth Overlay */
+    .auth-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(17, 17, 17, 0.6);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+      backdrop-filter: blur(4px);
+    }
+    .auth-card {
+      width: 90%; max-width: 440px; background: #fff;
+      border-radius: 16px; padding: 32px; border: 1px solid var(--hairline);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    }
+    .auth-title { font-size: 16px; font-weight: 800; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .auth-subtitle { font-size: 12px; color: var(--steel); line-height: 1.4; margin-bottom: 20px; }
+    .auth-error {
+      display: none; padding: 10px 12px; border-radius: 8px;
+      background: #FEE2E2; color: var(--trapRed); font-size: 12px; font-weight: 600;
+      margin-bottom: 16px; border: 1px solid rgba(211,47,47,0.2);
+    }
     
     .mode-toggle {
       display: flex; gap: 8px; margin-bottom: 20px;
@@ -268,13 +367,14 @@ class DesktopConnectService {
       display: block; font-size: 11px; font-weight: 800; color: var(--steel);
       text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;
     }
-    input[type="text"], select, textarea {
+    input[type="text"], input[type="password"], select, textarea {
       width: 100%; padding: 12px 14px; border-radius: 10px;
       border: 1px solid var(--hairline); background: var(--canvas);
       font-size: 14px; color: var(--carbon); font-family: inherit;
       outline: none; transition: border-color 0.2s;
     }
-    input[type="text"]:focus, select:focus, textarea:focus {
+    input[readonly] { background: #f0f0f3; color: var(--steel); cursor: not-allowed; }
+    input:focus, select:focus, textarea:focus {
       border-color: var(--carbon);
     }
     textarea { resize: vertical; min-height: 90px; line-height: 1.5; }
@@ -321,13 +421,35 @@ class DesktopConnectService {
   </style>
 </head>
 <body>
+  <!-- Embedded Authentication Modal -->
+  <div id="authOverlay" class="auth-overlay">
+    <div class="auth-card">
+      <div class="auth-title">DESKTOP AUTHENTICATION</div>
+      <p class="auth-subtitle">Verify your account password to securely sync exam blunders and screenshot autopsies to @$username's phone.</p>
+      
+      <div id="authError" class="auth-error"></div>
+
+      <div class="form-group">
+        <label class="form-label">Phone Account Handle</label>
+        <input type="text" value="@$username" readonly>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Account Password</label>
+        <input type="password" id="authPasswordInput" placeholder="Enter account password" autofocus onkeydown="if(event.key==='Enter') verifyDesktopAuth()">
+      </div>
+
+      <button type="button" class="submit-btn" id="authSubmitBtn" onclick="verifyDesktopAuth()">UNLOCK DESKTOP BRIDGE</button>
+    </div>
+  </div>
+
   <div class="container">
     <div class="header">
       <div class="logo-area">
         <div class="logo-badge">S</div>
         <div class="title-area">
           <h1>Slip Desktop Bridge</h1>
-          <p>Connected to @$username's Phone · Real-time Sync</p>
+          <p>Connected to @$username's Phone · <a href="javascript:void(0)" onclick="lockSession()" style="color:var(--steel); text-decoration:underline;">Lock Session</a></p>
         </div>
       </div>
       <div class="status-pill">
@@ -353,6 +475,7 @@ class DesktopConnectService {
             <option value="GATE DA">GATE DA</option>
             <option value="GATE EC">GATE EC</option>
             <option value="GATE ME">GATE ME</option>
+            <option value="General">General</option>
           </select>
         </div>
         <div class="form-group">
@@ -397,6 +520,58 @@ class DesktopConnectService {
   <script>
     let activeMode = 'mistake';
     let base64Image = null;
+    let desktopToken = sessionStorage.getItem('slip_desktop_token');
+
+    // Check existing session
+    if (desktopToken) {
+      document.getElementById('authOverlay').style.display = 'none';
+    }
+
+    async function verifyDesktopAuth() {
+      const pass = document.getElementById('authPasswordInput').value;
+      const errBox = document.getElementById('authError');
+      const authBtn = document.getElementById('authSubmitBtn');
+      errBox.style.display = 'none';
+
+      if (!pass || pass.trim().length === 0) {
+        errBox.textContent = 'Please enter your account password.';
+        errBox.style.display = 'block';
+        return;
+      }
+
+      authBtn.disabled = true;
+      authBtn.textContent = 'VERIFYING...';
+
+      try {
+        const res = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pass })
+        });
+        const data = await res.json();
+        if (res.ok && data.success && data.token) {
+          desktopToken = data.token;
+          sessionStorage.setItem('slip_desktop_token', desktopToken);
+          document.getElementById('authOverlay').style.display = 'none';
+        } else {
+          errBox.textContent = data.error || 'Authentication failed. Please check password.';
+          errBox.style.display = 'block';
+        }
+      } catch (e) {
+        errBox.textContent = 'Could not communicate with phone: ' + e.message;
+        errBox.style.display = 'block';
+      } finally {
+        authBtn.disabled = false;
+        authBtn.textContent = 'UNLOCK DESKTOP BRIDGE';
+      }
+    }
+
+    function lockSession() {
+      sessionStorage.removeItem('slip_desktop_token');
+      desktopToken = null;
+      document.getElementById('authPasswordInput').value = '';
+      document.getElementById('authOverlay').style.display = 'flex';
+    }
 
     function setMode(mode) {
       activeMode = mode;
@@ -465,6 +640,11 @@ class DesktopConnectService {
 
     async function submitForm(e) {
       e.preventDefault();
+      if (!desktopToken) {
+        lockSession();
+        return;
+      }
+
       const submitBtn = document.getElementById('submitBtn');
       submitBtn.disabled = true;
       submitBtn.textContent = 'SAVING TO SLIP APP...';
@@ -483,7 +663,10 @@ class DesktopConnectService {
       try {
         const res = await fetch('/api/slips', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + desktopToken
+          },
           body: JSON.stringify(payload)
         });
         const result = await res.json();
@@ -497,6 +680,9 @@ class DesktopConnectService {
           document.getElementById('trapInput').value = '';
           document.getElementById('fixInput').value = '';
           removeImage();
+        } else if (res.status === 401) {
+          alert('Desktop session expired or unauthorized. Please re-enter your password.');
+          lockSession();
         } else {
           alert('Error: ' + (result.error || 'Failed to save'));
         }
