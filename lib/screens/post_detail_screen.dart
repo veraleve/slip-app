@@ -42,6 +42,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> with TickerProvider
   late Animation<double> _sameAnimation;
   late AnimationController _solveController;
   late Animation<double> _solveAnimation;
+  late AnimationController _clearController;
+  late Animation<double> _clearAnimation;
   bool _showSameOverlay = false;
 
   @override
@@ -68,6 +70,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> with TickerProvider
       TweenSequenceItem(tween: Tween(begin: 1.35, end: 1.0).chain(CurveTween(curve: Curves.easeInQuad)), weight: 50),
     ]).animate(_solveController);
 
+    _clearController = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
+    _clearAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.35).chain(CurveTween(curve: Curves.easeOutBack)), weight: 50),
+      TweenSequenceItem(tween: Tween(begin: 1.35, end: 1.0).chain(CurveTween(curve: Curves.easeInQuad)), weight: 50),
+    ]).animate(_clearController);
+
     _loadComments();
   }
 
@@ -81,6 +89,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> with TickerProvider
     _saveController.dispose();
     _sameController.dispose();
     _solveController.dispose();
+    _clearController.dispose();
     _commentController.dispose();
     _commentFocusNode.dispose();
     super.dispose();
@@ -545,6 +554,44 @@ class _PostDetailScreenState extends State<PostDetailScreen> with TickerProvider
                             ),
                           ),
                         ),
+                      )
+                    else
+                      ScaleTransition(
+                        scale: _clearAnimation,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(20),
+                          onTap: () {
+                            HapticFeedback.mediumImpact();
+                            _clearController.forward(from: 0.0);
+                            widget.provider.toggleCleared(slip.id);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: slip.hasCleared ? const Color(0xFFDCFCE7) : const Color(0xFFF3F4F6),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  slip.hasCleared ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                                  size: 14,
+                                  color: slip.hasCleared ? const Color(0xFF16A34A) : SlipTheme.steel,
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  slip.hasCleared ? 'Mastered' : 'Mark Mastered',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: slip.hasCleared ? const Color(0xFF16A34A) : SlipTheme.carbon,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                   ],
                 ),
@@ -616,12 +663,20 @@ class _PostDetailScreenState extends State<PostDetailScreen> with TickerProvider
   // Reddit-style Comment Node with Threaded Replies
   Widget _buildCommentNode(SlipComment comment, List<SlipComment> replies) {
     final isAuthorOfPost = _isAuthor(comment.authorHandle, comment.authorId);
+    final isDoubt = widget.slip.postType == PostType.doubt;
+    final currentUserId = widget.provider.currentUserId;
+    final currentUsername = widget.provider.currentUsername?.toLowerCase().trim();
+    final isViewerAuthorOfPost = (currentUserId != null && widget.slip.authorId == currentUserId) ||
+        (currentUsername != null && widget.slip.authorUsername?.toLowerCase().trim() == currentUsername);
 
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFFAFAFA),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFF0F0F0), width: 0.8),
+        border: Border.all(
+          color: comment.isAcceptedAnswer ? const Color(0xFF86EFAC) : const Color(0xFFF0F0F0),
+          width: comment.isAcceptedAnswer ? 1.2 : 0.8,
+        ),
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -667,6 +722,32 @@ class _PostDetailScreenState extends State<PostDetailScreen> with TickerProvider
                   ),
                 ),
               ],
+              if (comment.isAcceptedAnswer) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF16A34A),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_rounded, size: 10, color: Colors.white),
+                      SizedBox(width: 2),
+                      Text(
+                        'SOLUTION',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const Spacer(),
               Text(
                 _formatTimeAgo(comment.createdAt),
@@ -687,29 +768,71 @@ class _PostDetailScreenState extends State<PostDetailScreen> with TickerProvider
           ),
           const SizedBox(height: 8),
 
-          // Action row: Reply Button
-          InkWell(
-            onTap: () {
-              setState(() {
-                _replyingToComment = comment;
-              });
-              _commentFocusNode.requestFocus();
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 2, horizontal: 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.reply_rounded, size: 14, color: SlipTheme.steel),
-                  SizedBox(width: 4),
-                  Text(
-                    'Reply',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: SlipTheme.steel),
+          // Action row: Reply Button and Author Solution Toggle
+          Row(
+            children: [
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _replyingToComment = comment;
+                  });
+                  _commentFocusNode.requestFocus();
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.reply_rounded, size: 14, color: SlipTheme.steel),
+                      SizedBox(width: 4),
+                      Text(
+                        'Reply',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: SlipTheme.steel),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
+              if (isDoubt && isViewerAuthorOfPost) ...[
+                const SizedBox(width: 12),
+                InkWell(
+                  onTap: () async {
+                    HapticFeedback.mediumImpact();
+                    final newState = !comment.isAcceptedAnswer;
+                    await widget.provider.toggleCommentAccepted(
+                      slipId: widget.slip.id,
+                      commentId: comment.id,
+                      isAccepted: newState,
+                    );
+                    await _loadComments();
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          comment.isAcceptedAnswer ? Icons.check_circle_rounded : Icons.check_circle_outline_rounded,
+                          size: 14,
+                          color: comment.isAcceptedAnswer ? const Color(0xFF16A34A) : SlipTheme.steel,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          comment.isAcceptedAnswer ? 'Accepted Solution' : 'Mark as Solution',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: comment.isAcceptedAnswer ? const Color(0xFF16A34A) : SlipTheme.steel,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
 
           // Threaded Nested Replies (Indented with a left thread line)

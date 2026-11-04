@@ -208,6 +208,13 @@ class SupabaseService {
           }
 
           final pObj = Profile.fromJson(p);
+          final agreed = p['agreed_terms'] as bool? ?? false;
+          final agreedVersion = p['agreed_terms_version'] as String? ?? '1.0';
+          if (agreed) {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool('slip_agreed_terms', true);
+            await prefs.setString('slip_agreed_terms_version', agreedVersion);
+          }
           await _persistSession(pObj.handle, pObj.id, pObj.targetExams);
           return true;
         } else {
@@ -235,6 +242,8 @@ class SupabaseService {
     required String username,
     required String password,
     List<String> targetExams = const [GateSyllabus.gateCS],
+    bool agreedTerms = true,
+    String termsVersion = '1.0',
   }) async {
     final cleanUsername = username.trim();
     final cleanPassword = password.trim();
@@ -261,11 +270,18 @@ class SupabaseService {
           'target_exams': resolvedExams,
           'target_exam': resolvedExams.first,
           'avatar_glyph': cleanUsername.substring(0, 1).toUpperCase(),
+          'agreed_terms': agreedTerms,
+          'agreed_terms_version': termsVersion,
+          'agreed_terms_at': DateTime.now().toUtc().toIso8601String(),
         });
       } catch (e) {
         debugPrint('Sign up error: $e');
       }
     }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('slip_agreed_terms', agreedTerms);
+    await prefs.setString('slip_agreed_terms_version', termsVersion);
 
     await _persistSession(cleanUsername, uid, resolvedExams);
     return true;
@@ -363,6 +379,7 @@ class SupabaseService {
 
   String get _scopedUserSlipsKey => _userKey('slip_local_user_slips');
   String get _scopedSameIdsKey => _userKey('slip_same_ids');
+  String get _scopedClearedIdsKey => _userKey('slip_cleared_ids');
   String get _scopedSavedSlipsKey => _userKey('slip_saved_peer_slips');
   String get _scopedSavedSlipIdsKey => _userKey('slip_saved_slip_ids');
   String get _scopedDeletedIdsKey => _userKey('slip_deleted_ids');
@@ -371,8 +388,26 @@ class SupabaseService {
   Future<List<Slip>> loadLocalUserSlips() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final rawList = prefs.getStringList(_scopedUserSlipsKey) ?? prefs.getStringList('slip_local_user_slips') ?? [];
-      return rawList.map((str) => Slip.fromJson(jsonDecode(str) as Map<String, dynamic>)).toList();
+      final scopedRaw = prefs.getStringList(_scopedUserSlipsKey) ?? [];
+      final legacyRaw = prefs.getStringList('slip_local_user_slips') ?? [];
+
+      final Map<String, Slip> merged = {};
+      for (final str in legacyRaw) {
+        try {
+          final s = Slip.fromJson(jsonDecode(str) as Map<String, dynamic>);
+          merged[s.id] = s;
+        } catch (_) {}
+      }
+      for (final str in scopedRaw) {
+        try {
+          final s = Slip.fromJson(jsonDecode(str) as Map<String, dynamic>);
+          merged[s.id] = s;
+        } catch (_) {}
+      }
+
+      final list = merged.values.toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
     } catch (_) {
       return [];
     }
@@ -381,9 +416,53 @@ class SupabaseService {
   Future<void> saveLocalUserSlips(List<Slip> slips) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final userSlips = slips.where((s) => (s.authorId != null && s.authorId == _currentUserId) || (s.authorUsername != null && s.authorUsername?.toLowerCase().trim() == _currentUsername?.toLowerCase().trim())).toList();
-      final List<String> rawList = userSlips.map((s) => jsonEncode(s.toJson())).toList();
+      final List<String> rawList = slips.map((s) => jsonEncode(s.toJson())).toList();
       await prefs.setStringList(_scopedUserSlipsKey, rawList);
+      await prefs.setStringList('slip_local_user_slips', rawList);
+    } catch (_) {}
+  }
+
+  Future<Set<String>> getClearedSlipIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final scoped = prefs.getStringList(_scopedClearedIdsKey) ?? [];
+      final legacy = prefs.getStringList('slip_cleared_ids') ?? [];
+      return {...legacy, ...scoped};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> setSlipCleared(String slipId, bool isCleared) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final set = (await getClearedSlipIds());
+      if (isCleared) {
+        set.add(slipId);
+      } else {
+        set.remove(slipId);
+      }
+      await prefs.setStringList(_scopedClearedIdsKey, set.toList());
+      await prefs.setStringList('slip_cleared_ids', set.toList());
+
+      // Update in local cache as well
+      final local = await loadLocalUserSlips();
+      final idx = local.indexWhere((s) => s.id == slipId);
+      if (idx != -1) {
+        local[idx] = local[idx].copyWith(hasCleared: isCleared);
+        await saveLocalUserSlips(local);
+      }
+
+      final cached = await loadCachedFeed();
+      final cIdx = cached.indexWhere((s) => s.id == slipId);
+      if (cIdx != -1) {
+        cached[cIdx] = cached[cIdx].copyWith(hasCleared: isCleared);
+        await saveCachedFeed(cached);
+      }
+
+      if (isCleared) {
+        await recordInteraction(slipId: slipId, interactionType: 'cleared');
+      }
     } catch (_) {}
   }
 
@@ -397,6 +476,22 @@ class SupabaseService {
         set.remove(slipId);
       }
       await prefs.setStringList(_scopedSameIdsKey, set.toList());
+
+      // Update in localUserSlips
+      final local = await loadLocalUserSlips();
+      final idx = local.indexWhere((s) => s.id == slipId);
+      if (idx != -1) {
+        local[idx] = local[idx].copyWith(sameCount: count, hasSaidSame: hasSaidSame);
+        await saveLocalUserSlips(local);
+      }
+
+      // Update in cachedFeed
+      final cached = await loadCachedFeed();
+      final cIdx = cached.indexWhere((s) => s.id == slipId);
+      if (cIdx != -1) {
+        cached[cIdx] = cached[cIdx].copyWith(sameCount: count, hasSaidSame: hasSaidSame);
+        await saveCachedFeed(cached);
+      }
 
       if (_client != null) {
         try {
@@ -412,14 +507,35 @@ class SupabaseService {
 
   Future<Map<String, int>> fetchCommentCounts() async {
     final Map<String, int> counts = {};
+
+    // 1. Read persistent local comment counts
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final keys = prefs.getKeys().where((k) => k.startsWith('slip_comments_'));
+      for (final k in keys) {
+        final sid = k.substring('slip_comments_'.length);
+        final list = prefs.getStringList(k) ?? [];
+        if (list.isNotEmpty) {
+          counts[sid] = list.length;
+        }
+      }
+    } catch (_) {}
+
+    // 2. Query Supabase cloud counts
     if (_client != null) {
       try {
         final res = await _client!.from('slip_comments').select('slip_id');
+        final Map<String, int> cloudCounts = {};
         for (final item in (res as List)) {
           final sid = item['slip_id']?.toString();
           if (sid != null) {
-            counts[sid] = (counts[sid] ?? 0) + 1;
+            cloudCounts[sid] = (cloudCounts[sid] ?? 0) + 1;
           }
+        }
+        for (final entry in cloudCounts.entries) {
+          counts[entry.key] = (counts[entry.key] ?? 0) > entry.value
+              ? counts[entry.key]!
+              : entry.value;
         }
       } catch (e) {
         debugPrint('fetchCommentCounts error: $e');
@@ -515,6 +631,7 @@ class SupabaseService {
     final savedPeerSlips = await loadSavedPeerSlips();
     final cachedFeed = await loadCachedFeed();
     final savedIds = await getSavedSlipIds();
+    final clearedIds = await getClearedSlipIds();
     final prefs = await SharedPreferences.getInstance();
     final deletedIds = (prefs.getStringList(_scopedDeletedIdsKey) ?? prefs.getStringList('slip_deleted_ids') ?? []).toSet();
     final sameIds = (prefs.getStringList(_scopedSameIdsKey) ?? []).toSet();
@@ -531,12 +648,13 @@ class SupabaseService {
       combinedMap[s.id] = s;
     }
 
-    // Ensure saved state, reaction state, and comment count are accurately reflected
+    // Ensure saved state, reaction state, cleared state, and comment count are accurately reflected
     for (final entry in combinedMap.entries) {
       final s = entry.value;
       combinedMap[entry.key] = s.copyWith(
         hasKept: savedIds.contains(s.id),
         hasSaidSame: sameIds.contains(s.id),
+        hasCleared: clearedIds.contains(s.id),
         commentsCount: commentCounts[s.id] ?? s.commentsCount,
       );
     }
@@ -557,6 +675,7 @@ class SupabaseService {
             combinedMap[slip.id] = slip.copyWith(
               hasKept: savedIds.contains(slip.id),
               hasSaidSame: sameIds.contains(slip.id),
+              hasCleared: clearedIds.contains(slip.id),
               commentsCount: commentCounts[slip.id] ?? slip.commentsCount,
             );
           }
@@ -565,6 +684,13 @@ class SupabaseService {
           final sortedForCache = combinedMap.values.where((s) => s.isPublic).toList();
           sortedForCache.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           await saveCachedFeed(sortedForCache);
+        }
+
+        // Auto-sync any local public slips to Supabase if not yet present
+        for (final local in localUserSlips) {
+          if (local.isPublic && !list.any((item) => item['id'] == local.id)) {
+            submitSlip(local);
+          }
         }
 
         // Also fetch this signed-in user's slips from Supabase so reinstalling never loses them!
@@ -580,6 +706,7 @@ class SupabaseService {
               combinedMap[s.id] = s.copyWith(
                 hasKept: savedIds.contains(s.id),
                 hasSaidSame: sameIds.contains(s.id),
+                hasCleared: clearedIds.contains(s.id),
                 commentsCount: commentCounts[s.id] ?? s.commentsCount,
               );
             }
@@ -792,6 +919,13 @@ class SupabaseService {
       await saveLocalUserSlips(local);
     }
 
+    final cached = await loadCachedFeed();
+    final cIdx = cached.indexWhere((s) => s.id == slipId);
+    if (cIdx != -1) {
+      cached[cIdx] = cached[cIdx].copyWith(isResolved: isResolved);
+      await saveCachedFeed(cached);
+    }
+
     if (_client != null) {
       try {
         await _client!.from('slips').update({
@@ -904,10 +1038,39 @@ class SupabaseService {
     } catch (_) {}
   }
 
-  // --- 4. COMMENTS SYSTEM (HYBRID SYNC) ---
+  // --- 4. COMMENTS SYSTEM (PERSISTENT & CLOUD-SYNCED) ---
   final Map<String, List<Map<String, dynamic>>> _localCommentsCache = {};
 
+  Future<List<Map<String, dynamic>>> _loadPersistentComments(String slipId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('slip_comments_$slipId') ?? [];
+      return list.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> _savePersistentComments(String slipId, List<Map<String, dynamic>> comments) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = comments.map(jsonEncode).toList();
+      await prefs.setStringList('slip_comments_$slipId', list);
+    } catch (_) {}
+  }
+
   Future<List<Map<String, dynamic>>> fetchComments(String slipId) async {
+    final persistent = await _loadPersistentComments(slipId);
+    final inMem = _localCommentsCache[slipId] ?? [];
+
+    final Map<String, Map<String, dynamic>> combined = {};
+    for (final c in persistent) {
+      combined[c['id'].toString()] = c;
+    }
+    for (final c in inMem) {
+      combined[c['id'].toString()] = c;
+    }
+
     if (_client != null) {
       try {
         final res = await _client!
@@ -917,11 +1080,25 @@ class SupabaseService {
             .order('created_at', ascending: true);
         final list = res as List;
         if (list.isNotEmpty) {
-          return list.map((e) => e as Map<String, dynamic>).toList();
+          for (final item in list) {
+            final m = item as Map<String, dynamic>;
+            combined[m['id'].toString()] = m;
+          }
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('fetchComments Supabase error: $e');
+      }
     }
-    return _localCommentsCache[slipId] ?? [];
+
+    final result = combined.values.toList();
+    result.sort((a, b) {
+      final dtA = DateTime.tryParse(a['created_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final dtB = DateTime.tryParse(b['created_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return dtA.compareTo(dtB);
+    });
+
+    await _savePersistentComments(slipId, result);
+    return result;
   }
 
   Future<bool> postComment({
@@ -930,22 +1107,49 @@ class SupabaseService {
     String? parentId,
     bool isAcceptedAnswer = false,
   }) async {
+    final commentId = generateUuid();
+    final validAuthorId = (_currentUserId != null && isUuid(_currentUserId!))
+        ? _currentUserId!
+        : generateUuid();
+
     final comment = {
-      'id': generateUuid(),
+      'id': commentId,
       'slip_id': slipId,
-      if (parentId != null) 'parent_id': parentId,
-      'author_id': _currentUserId,
+      if (parentId != null && parentId.isNotEmpty) 'parent_id': parentId,
+      'author_id': validAuthorId,
       'author_handle': _currentUsername ?? 'peer',
       'body': body,
       'is_accepted_answer': isAcceptedAnswer,
       'created_at': DateTime.now().toUtc().toIso8601String(),
     };
 
+    // 1. In-memory cache
     _localCommentsCache.putIfAbsent(slipId, () => []).add(comment);
 
+    // 2. Persistent SharedPreferences storage
+    final localList = await _loadPersistentComments(slipId);
+    localList.add(comment);
+    await _savePersistentComments(slipId, localList);
+
+    // 3. Increment comments count locally in localUserSlips & cachedFeed
+    try {
+      final localSlips = await loadLocalUserSlips();
+      final idx = localSlips.indexWhere((s) => s.id == slipId);
+      if (idx != -1) {
+        localSlips[idx] = localSlips[idx].copyWith(commentsCount: localSlips[idx].commentsCount + 1);
+        await saveLocalUserSlips(localSlips);
+      }
+      final cached = await loadCachedFeed();
+      final cIdx = cached.indexWhere((s) => s.id == slipId);
+      if (cIdx != -1) {
+        cached[cIdx] = cached[cIdx].copyWith(commentsCount: cached[cIdx].commentsCount + 1);
+        await saveCachedFeed(cached);
+      }
+    } catch (_) {}
+
+    // 4. Send to Supabase
     if (_client != null) {
       try {
-        // Ensure slip exists in Supabase so foreign key doesn't fail
         final slipCheck = await _client!.from('slips').select('id').eq('id', slipId).limit(1);
         if ((slipCheck as List).isEmpty) {
           final localSlips = await loadLocalUserSlips();
@@ -960,5 +1164,80 @@ class SupabaseService {
       }
     }
     return true;
+  }
+
+  Future<bool> toggleCommentAccepted({
+    required String slipId,
+    required String commentId,
+    required bool isAccepted,
+  }) async {
+    // 1. Update local persistent comments
+    final localList = await _loadPersistentComments(slipId);
+    for (int i = 0; i < localList.length; i++) {
+      if (localList[i]['id'] == commentId) {
+        localList[i]['is_accepted_answer'] = isAccepted;
+      }
+    }
+    await _savePersistentComments(slipId, localList);
+
+    // 2. Update parent slip to resolved if accepted
+    if (isAccepted) {
+      await toggleDoubtResolved(slipId, true);
+    }
+
+    // 3. Update Supabase
+    if (_client != null) {
+      try {
+        await _client!.from('slip_comments').update({
+          'is_accepted_answer': isAccepted,
+        }).eq('id', commentId);
+      } catch (e) {
+        debugPrint('toggleCommentAccepted error: $e');
+      }
+    }
+    return true;
+  }
+
+  // --- 5. BROADCAST NOTIFICATIONS & TERMS TRACKING ---
+  Future<void> recordTermsAgreement({
+    required bool agreed,
+    String version = '1.0',
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('slip_agreed_terms', agreed);
+    await prefs.setString('slip_agreed_terms_version', version);
+
+    if (_client != null && _currentUserId != null) {
+      try {
+        await _client!.from('profiles').update({
+          'agreed_terms': agreed,
+          'agreed_terms_version': version,
+          'agreed_terms_at': DateTime.now().toUtc().toIso8601String(),
+        }).eq('id', _currentUserId!);
+      } catch (_) {}
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchBroadcastNotifications() async {
+    if (_client != null) {
+      try {
+        final res = await _client!
+            .from('broadcast_notifications')
+            .select()
+            .order('created_at', ascending: false)
+            .limit(10);
+        final list = (res as List).map((e) => e as Map<String, dynamic>).toList();
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList('slip_cached_broadcasts', list.map(jsonEncode).toList());
+        return list;
+      } catch (_) {}
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getStringList('slip_cached_broadcasts') ?? [];
+      return cached.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
+    } catch (_) {
+      return [];
+    }
   }
 }

@@ -147,12 +147,6 @@ class _FeedScreenState extends State<FeedScreen>
 
                   Row(
                     children: [
-                      IconButton(
-                        onPressed: () => provider.refreshStream(),
-                        icon: const Icon(Icons.refresh_rounded, size: 21, color: SlipTheme.carbon),
-                        tooltip: 'Refresh feed',
-                        visualDensity: VisualDensity.compact,
-                      ),
                       // Notification Bell with unread indicator
                       Stack(
                         children: [

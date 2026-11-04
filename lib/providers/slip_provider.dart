@@ -40,7 +40,7 @@ class SlipProvider extends ChangeNotifier {
       result = result.where((s) => s.subtopic == _selectedSubtopicFilter).toList();
     }
 
-    if (_selectedTopicFilter != 'All' && _selectedSubjectFilter == 'All') {
+    if (_selectedTopicFilter != 'All' && _selectedTopicFilter != 'For You' && _selectedSubjectFilter == 'All') {
       if (_selectedTopicFilter == 'General') {
         result = result.where((s) => s.examTag == 'General' || s.topic == 'General' || s.subtopic == 'General').toList();
       } else {
@@ -114,7 +114,7 @@ class SlipProvider extends ChangeNotifier {
   Future<void> refreshStream() async {
     _isLoading = true;
     notifyListeners();
-    final allowedPapers = _selectedExamFilter == 'All' ? null : [_selectedExamFilter];
+    final allowedPapers = _selectedExamFilter == 'All' ? ['All'] : [_selectedExamFilter];
     _slips = await _service.fetchStream(userPapers: allowedPapers);
     _isLoading = false;
     notifyListeners();
@@ -285,7 +285,7 @@ class SlipProvider extends ChangeNotifier {
 
   void setExamFilter(String exam) {
     _selectedExamFilter = exam;
-    _selectedTopicFilter = 'For You'; // Reset topic filter to recommendation on exam switch
+    _selectedTopicFilter = 'All'; // Reset to All on exam switch
     _selectedSubjectFilter = 'All';
     _selectedSubtopicFilter = 'All Topics';
     notifyListeners();
@@ -311,7 +311,7 @@ class SlipProvider extends ChangeNotifier {
   void resetCascadingFilters() {
     _selectedSubjectFilter = 'All';
     _selectedSubtopicFilter = 'All Topics';
-    _selectedTopicFilter = 'For You';
+    _selectedTopicFilter = 'All';
     notifyListeners();
   }
 
@@ -409,9 +409,7 @@ class SlipProvider extends ChangeNotifier {
     );
     notifyListeners();
 
-    if (newState) {
-      _service.recordInteraction(slipId: slipId, interactionType: 'cleared');
-    }
+    _service.setSlipCleared(slipId, newState);
   }
 
   // 4b. Toggle Doubt Resolved Status
@@ -426,6 +424,26 @@ class SlipProvider extends ChangeNotifier {
     notifyListeners();
 
     _service.toggleDoubtResolved(slipId, newState);
+  }
+
+  // 4c. Toggle Comment Accepted Solution
+  Future<void> toggleCommentAccepted({
+    required String slipId,
+    required String commentId,
+    required bool isAccepted,
+  }) async {
+    await _service.toggleCommentAccepted(
+      slipId: slipId,
+      commentId: commentId,
+      isAccepted: isAccepted,
+    );
+    if (isAccepted) {
+      final index = _slips.indexWhere((s) => s.id == slipId);
+      if (index != -1) {
+        _slips[index] = _slips[index].copyWith(isResolved: true);
+      }
+    }
+    notifyListeners();
   }
 
   void setPostTypeFilter(PostType? filter) {

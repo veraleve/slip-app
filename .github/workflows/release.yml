@@ -68,13 +68,13 @@ jobs:
             ## Slip — Ask doubts. Learn from mistakes. Master together.
 
             ### What's New in ${{ steps.get_tag.outputs.TAG_NAME }}:
-            - **MIT Open-Source License**: Official open-source release with standard MIT licensing and updated contribution guides.
-            - **Security & Injection Lockdown**: Defeated PostgREST wildcard injection and null-account takeover in authentication and password reset; secured local desktop HTTP bridge with cryptographic token entropy and removed fallback bypasses.
-            - **Multi-Account Storage Isolation**: Completely scoped bookmarks, deletion filters, cached drafts, and custom revision task lists per user handle.
-            - **Native Android Hardware Bridge Fixes**: Fixed camera and microphone permission request delegation to prevent UI freezes, and switched remote audio playback to asynchronous preparation to avoid ANR crashes.
-            - **Data Integrity & Multi-Image Attachments**: Preserved all multi-image attachments locally and in cloud storage; preserved General Doubt tagging across cache deserialization.
-            - **Peer Access Control**: Protected peer blunder posts from unauthorized deletion or editing in profile views.
-            - **Swiss Design Polish**: Converted all boxy container and badge radii to Swiss curved pill standards (6-16px) and purged emoji artifacts from web server templates.
+            - **Feed Refresh & Topic Filter Fix**: Eliminated the 'For You' filter collision that purged posts on manual refresh; guaranteed peer and personal posts remain persistent.
+            - **Persistent Comments & Cloud Synchronization**: Threaded comments and answers now persist locally and synchronize reliably to Supabase with validated UUID author signatures.
+            - **Solution Marking in Discussions**: Doubt authors can now mark helpful peer comments as the 'Accepted Solution', automatically resolving the doubt.
+            - **Persistent Cleared/Mastered Status**: Retained blunder inoculation mastery across app updates, offline restarts, and remote sync.
+            - **1-Time Community Standards & Privacy Agreement**: Integrated a professional one-time agreement on sign-up enforcing zero-harassment and data privacy, stored in the cloud database.
+            - **Broadcast Notifications Engine**: Real-time policy update and community notice announcements in the notification center.
+            - **UI Refinements**: Removed redundant header refresh icon in favor of smooth pull-to-refresh; polished tactile button animations.
 
             **Direct Download:** `slip.apk`
           files: build/app/outputs/flutter-apk/slip.apk

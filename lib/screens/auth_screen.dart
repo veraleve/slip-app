@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/gate_syllabus.dart';
 import '../services/supabase_service.dart';
 import '../theme/slip_theme.dart';
@@ -17,6 +18,7 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isSignUp = false;
   bool _isLoading = false;
   bool _rememberDevice = true;
+  bool _hasAgreedToTerms = false;
   String? _errorMessage;
 
   final TextEditingController _usernameController = TextEditingController();
@@ -32,6 +34,151 @@ class _AuthScreenState extends State<AuthScreen> {
     if (saved != null && saved.isNotEmpty) {
       _usernameController.text = saved;
     }
+    _loadSavedAgreement();
+  }
+
+  Future<void> _loadSavedAgreement() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final agreed = prefs.getBool('slip_agreed_terms') ?? false;
+      if (mounted && agreed) {
+        setState(() => _hasAgreedToTerms = true);
+      }
+    } catch (_) {}
+  }
+
+  void _showTermsModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: SlipTheme.canvas,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.8,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (_, scrollController) => Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: SlipTheme.hairline,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'COMMUNITY STANDARDS & PRIVACY',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
+                  color: SlipTheme.carbon,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Slip is a distraction-free peer mistake inoculation platform built for academic rigor and mutual respect.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: SlipTheme.steel,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Divider(color: SlipTheme.hairline, height: 1),
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  children: const [
+                    Text(
+                      '1. CODE OF CONDUCT (STRICT NON-ABUSE)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: SlipTheme.carbon,
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      '• Absolute zero tolerance for harassment, personal attacks, bullying, offensive slurs, hate speech, or derogatory remarks directed at peers.\n'
+                      '• Constructive dialogue only: analyze the mathematical trap, logic blunder, or conceptual flaw, never attack the student who made the mistake.\n'
+                      '• Academic honesty: share authentic doubts, genuine mistakes, and helpful step-by-step solutions.',
+                      style: TextStyle(fontSize: 12, color: SlipTheme.carbon, height: 1.45),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      '2. PRIVACY & LOCAL-FIRST STORAGE',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: SlipTheme.carbon,
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      '• Private notes, blunders, and task schedules stay locally on your device and are never broadcast without your consent.\n'
+                      '• Only public doubts and mistakes you intentionally submit to the shared stream are visible to other peers.\n'
+                      '• Zero tracking, zero third-party advertising SDKs, zero data selling.',
+                      style: TextStyle(fontSize: 12, color: SlipTheme.carbon, height: 1.45),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      '3. OPEN SOURCE & MIT LICENSE',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: SlipTheme.carbon,
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      '• Slip is licensed under the MIT License.\n'
+                      '• All rights in user contributions remain with respective authors while granting Slip a license to display them to network peers.',
+                      style: TextStyle(fontSize: 12, color: SlipTheme.carbon, height: 1.45),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: SlipTheme.hairline, height: 1),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: SlipTheme.carbon,
+                    foregroundColor: SlipTheme.canvas,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  onPressed: () async {
+                    setState(() => _hasAgreedToTerms = true);
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setBool('slip_agreed_terms', true);
+                    await prefs.setString('slip_agreed_terms_version', '1.0');
+                    if (context.mounted) Navigator.of(ctx).pop();
+                  },
+                  child: const Text(
+                    'I AGREE & UNDERSTAND',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -119,6 +266,13 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
 
+    if (_isSignUp && !_hasAgreedToTerms) {
+      setState(() {
+        _errorMessage = 'PLEASE AGREE TO THE CODE OF CONDUCT & PRIVACY POLICY.';
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -132,6 +286,8 @@ class _AuthScreenState extends State<AuthScreen> {
         username: username,
         password: password,
         targetExams: _selectedExams.toList(),
+        agreedTerms: _hasAgreedToTerms,
+        termsVersion: '1.0',
       );
     } else {
       success = await service.signInWithUsername(
@@ -449,6 +605,77 @@ class _AuthScreenState extends State<AuthScreen> {
                       ),
                     ],
                   ),
+
+                  // 1-Time Agreement to Code of Conduct, Terms & Privacy Policy
+                  if (_isSignUp) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: Checkbox(
+                            value: _hasAgreedToTerms,
+                            activeColor: SlipTheme.carbon,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            onChanged: (val) async {
+                              final next = val ?? false;
+                              setState(() => _hasAgreedToTerms = next);
+                              if (next) {
+                                final prefs = await SharedPreferences.getInstance();
+                                await prefs.setBool('slip_agreed_terms', true);
+                                await prefs.setString('slip_agreed_terms_version', '1.0');
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => _showTermsModal(context),
+                            child: RichText(
+                              text: const TextSpan(
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: SlipTheme.carbon,
+                                  height: 1.3,
+                                ),
+                                children: [
+                                  TextSpan(text: 'I agree to the '),
+                                  TextSpan(
+                                    text: 'Code of Conduct',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                  TextSpan(text: ', '),
+                                  TextSpan(
+                                    text: 'Terms',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                  TextSpan(text: ' & '),
+                                  TextSpan(
+                                    text: 'Privacy Policy',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
 
                   if (_errorMessage != null) ...[
                     const SizedBox(height: 12),

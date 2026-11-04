@@ -2,7 +2,7 @@ name: slip
 description: "Slip — Open-source peer learning platform where students learn from each other's exam blunders."
 publish_to: 'none'
 
-version: 0.1.13+14
+version: 0.1.14+15
 
 environment:
   sdk: '>=3.2.0 <4.0.0'

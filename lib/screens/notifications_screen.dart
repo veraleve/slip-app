@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import '../models/slip.dart';
 import '../providers/slip_provider.dart';
+import '../services/supabase_service.dart';
 import '../theme/slip_theme.dart';
 import 'post_detail_screen.dart';
 
-class NotificationsScreen extends StatelessWidget {
+class NotificationsScreen extends StatefulWidget {
   final SlipProvider? provider;
   final VoidCallback? onOpenReviewCycle;
 
@@ -14,22 +15,112 @@ class NotificationsScreen extends StatelessWidget {
     this.onOpenReviewCycle,
   });
 
+  @override
+  State<NotificationsScreen> createState() => _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends State<NotificationsScreen> {
+  List<Map<String, dynamic>> _broadcasts = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBroadcasts();
+  }
+
+  Future<void> _loadBroadcasts() async {
+    final list = await SupabaseService().fetchBroadcastNotifications();
+    if (mounted) {
+      setState(() => _broadcasts = list);
+    }
+  }
+
+  void _showPolicySheet(BuildContext context, Map<String, dynamic> alert) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: SlipTheme.canvas,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: SlipTheme.hairline,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              alert['title'] as String? ?? 'POLICY UPDATE',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+                color: SlipTheme.carbon,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              alert['body'] as String? ?? '',
+              style: const TextStyle(
+                fontSize: 12.5,
+                color: SlipTheme.carbon,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Divider(color: SlipTheme.hairline, height: 1),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: SlipTheme.carbon,
+                  foregroundColor: SlipTheme.canvas,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('ACKNOWLEDGE', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _handleAlertTap(BuildContext context, Map<String, dynamic> alert) {
     final type = alert['type'] as String?;
     final slip = alert['slip'] as Slip?;
 
-    if (type == 'cycle') {
-      Navigator.of(context).pop();
-      onOpenReviewCycle?.call();
+    if (type == 'policy_update') {
+      _showPolicySheet(context, alert);
       return;
     }
 
-    if (slip != null && provider != null) {
+    if (type == 'cycle') {
+      Navigator.of(context).pop();
+      widget.onOpenReviewCycle?.call();
+      return;
+    }
+
+    if (slip != null && widget.provider != null) {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => PostDetailScreen(
             slip: slip,
-            provider: provider!,
+            provider: widget.provider!,
           ),
         ),
       );
@@ -38,8 +129,8 @@ class NotificationsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final allSlips = provider?.allSlips ?? [];
-    final currentUserId = provider?.currentUserId;
+    final allSlips = widget.provider?.allSlips ?? [];
+    final currentUserId = widget.provider?.currentUserId;
 
     final unmastered = allSlips
         .where((s) =>
@@ -53,6 +144,19 @@ class NotificationsScreen extends StatelessWidget {
         .toList();
 
     final List<Map<String, dynamic>> realAlerts = [];
+
+    // Prepend Broadcast Policy & Community Notifications
+    for (final b in _broadcasts) {
+      realAlerts.add({
+        'title': b['title']?.toString() ?? 'Community Notice',
+        'body': b['message']?.toString() ?? '',
+        'time': b['version'] != null ? 'v${b['version']}' : 'Notice',
+        'icon': Icons.security_rounded,
+        'color': SlipTheme.carbon,
+        'type': 'policy_update',
+        'slip': null,
+      });
+    }
 
     if (unmastered.isNotEmpty) {
       realAlerts.add({
