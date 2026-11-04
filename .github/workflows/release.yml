@@ -75,13 +75,11 @@ jobs:
             ## Slip — Ask doubts. Learn from mistakes. Master together.
 
             ### What's New in ${{ steps.get_tag.outputs.TAG_NAME }}:
-            - **Feed Refresh & Topic Filter Fix**: Eliminated the 'For You' filter collision that purged posts on manual refresh; guaranteed peer and personal posts remain persistent.
-            - **Persistent Comments & Cloud Synchronization**: Threaded comments and answers now persist locally and synchronize reliably to Supabase with validated UUID author signatures.
-            - **Solution Marking in Discussions**: Doubt authors can now mark helpful peer comments as the 'Accepted Solution', automatically resolving the doubt.
-            - **Persistent Cleared/Mastered Status**: Retained blunder inoculation mastery across app updates, offline restarts, and remote sync.
-            - **1-Time Community Standards & Privacy Agreement**: Integrated a professional one-time agreement on sign-up enforcing zero-harassment and data privacy, stored in the cloud database.
-            - **Broadcast Notifications Engine**: Real-time policy update and community notice announcements in the notification center.
-            - **UI Refinements**: Removed redundant header refresh icon in favor of smooth pull-to-refresh; polished tactile button animations.
+            - **Modular Desktop Workspace Architecture**: Refactored Desktop Bridge into dedicated modular components (Auth, Feed, Comments, Tasks, Web UI) for superior maintainability and performance.
+            - **Expanded Desktop Portal**: Full-featured laptop experience with live Peer Feed browsing, search filter, answer submission, accepted solution marking, and study revision task management.
+            - **GATE Paper Cloud & DB Synchronization**: Multi-exam target selection (CS, DA, EC, ME) now persists dynamically to user profiles in the database and synchronizes peer doubts instantaneously.
+            - **Feed Refresh Retention**: Resolved exam filter collisions and duplicate scope declarations; guaranteed authored doubts and blunders remain permanent on refresh.
+            - **Production Secret Fallback**: Robust runtime getters ensure continuous cloud connectivity across offline and online environments.
 
             **Direct Download:** `slip.apk`
           files: build/app/outputs/flutter-apk/slip.apk
