@@ -41,14 +41,9 @@ jobs:
 
       - name: Build APK (Release)
         run: |
-          DART_DEFINES=""
-          if [ -n "${{ secrets.SUPABASE_URL }}" ]; then
-            DART_DEFINES="$DART_DEFINES --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }}"
-          fi
-          if [ -n "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
-            DART_DEFINES="$DART_DEFINES --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}"
-          fi
-          flutter build apk --release --no-shrink $DART_DEFINES
+          PROD_URL="https://grydnpgufybxvmovdumg.supabase.co"
+          PROD_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdyeWRucGd1ZnlieHZtb3ZkdW1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM2NTkyMDMsImV4cCI6MjEwOTIzNTIwM30.OM2lsAooaLbkmG0GRAkgH2_s-yJKlgxniLCe_1g_OzQ"
+          flutter build apk --release --no-shrink --dart-define=SUPABASE_URL=$PROD_URL --dart-define=SUPABASE_ANON_KEY=$PROD_KEY
           cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/slip.apk
 
       - name: Determine Tag

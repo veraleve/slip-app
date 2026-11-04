@@ -751,7 +751,11 @@ class SupabaseService {
         // Auto-sync any local public slips to Supabase if not yet present
         for (final local in localUserSlips) {
           if (local.isPublic && !list.any((item) => item['id'] == local.id)) {
-            submitSlip(local);
+            try {
+              await submitSlip(local);
+            } catch (e) {
+              debugPrint('Auto-sync local slip error: $e');
+            }
           }
         }
 
@@ -915,10 +919,18 @@ class SupabaseService {
           uploadedImageUris.add(img);
         } else {
           final up = await uploadMediaFile(img, isAudio: false);
-          uploadedImageUris.add(up ?? img);
+          if (up != null && up.isNotEmpty) {
+            uploadedImageUris.add(up);
+          }
         }
       }
-      final String? firstImageUrl = uploadedImageUris.isNotEmpty ? uploadedImageUris.first : null;
+      final String? firstImageUrl = uploadedImageUris.isNotEmpty
+          ? uploadedImageUris.first
+          : (slip.scratchpadImageUrl != null &&
+                  (slip.scratchpadImageUrl!.startsWith('http://') ||
+                      slip.scratchpadImageUrl!.startsWith('https://'))
+              ? slip.scratchpadImageUrl
+              : null);
 
       String? voiceUrl;
       if (slip.voiceAudioUrl != null && slip.voiceAudioUrl!.isNotEmpty) {
@@ -948,7 +960,7 @@ class SupabaseService {
         await saveCachedFeed(cached);
       }
 
-      await _client!.from('slips').insert({
+      await _client!.from('slips').upsert({
         'id': resolvedSlip.id,
         'topic': resolvedSlip.topic.isNotEmpty ? resolvedSlip.topic : 'General',
         'subtopic': (resolvedSlip.subtopic != null && resolvedSlip.subtopic!.isNotEmpty) ? resolvedSlip.subtopic : 'General',
@@ -959,8 +971,9 @@ class SupabaseService {
         'is_public': resolvedSlip.isPublic,
         'trap_statement': resolvedSlip.trapStatement.isNotEmpty ? resolvedSlip.trapStatement : '',
         'fix_statement': resolvedSlip.fixStatement.isNotEmpty ? resolvedSlip.fixStatement : '',
-        'scratchpad_image_url': firstImageUrl ?? (resolvedSlip.imageUris.isNotEmpty ? resolvedSlip.imageUris.first : null),
-        'voice_audio_url': voiceUrl ?? resolvedSlip.voiceAudioUrl,
+        'scratchpad_image_url': firstImageUrl,
+        'image_uris': uploadedImageUris.isNotEmpty ? uploadedImageUris : null,
+        'voice_audio_url': voiceUrl,
         'author_id': validAuthorId,
         'author_handle': resolvedSlip.authorUsername ?? _currentUsername ?? 'peer',
         'audio_duration_seconds': resolvedSlip.audioDurationSeconds,
