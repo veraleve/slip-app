@@ -64,6 +64,32 @@ class SupabaseService {
           debugPrint('Supabase client connection warning: $e');
         }
       }
+
+      // 3. Sync profile from Supabase (target exams, agreements, handle confirmation)
+      if (_client != null && _currentUsername != null && _currentUsername!.isNotEmpty) {
+        try {
+          final res = await _client!
+              .from('profiles')
+              .select()
+              .ilike('handle', _currentUsername!)
+              .limit(1);
+          final list = res as List;
+          if (list.isNotEmpty) {
+            final p = list.first as Map<String, dynamic>;
+            final rawExams = p['target_exams'] as List<dynamic>?;
+            if (rawExams != null && rawExams.isNotEmpty) {
+              _targetExams = rawExams.map((e) => e.toString()).toList();
+              await prefs.setStringList('slip_target_exams', _targetExams);
+            }
+            final remoteAgreed = p['agreed_terms'] as bool? ?? false;
+            if (remoteAgreed) {
+              await prefs.setBool('slip_agreed_terms', true);
+            }
+          }
+        } catch (e) {
+          debugPrint('Profile sync on init warning: $e');
+        }
+      }
     } catch (e) {
       debugPrint('SupabaseService initialize error: $e');
     }
@@ -119,13 +145,26 @@ class SupabaseService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('slip_target_exams', _targetExams);
 
-    if (_client != null && _currentUserId != null) {
+    if (_client != null) {
+      final updateData = {
+        'target_exams': _targetExams,
+        'target_exam': primaryExam,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      };
       try {
-        await _client!.from('profiles').update({
-          'target_exams': _targetExams,
-          'target_exam': primaryExam,
-        }).eq('id', _currentUserId!);
-      } catch (_) {}
+        if (_currentUserId != null && _currentUserId!.isNotEmpty) {
+          await _client!.from('profiles').update(updateData).eq('id', _currentUserId!);
+        }
+      } catch (e) {
+        debugPrint('Target exams update by id error: $e');
+      }
+      try {
+        if (_currentUsername != null && _currentUsername!.isNotEmpty) {
+          await _client!.from('profiles').update(updateData).ilike('handle', _currentUsername!);
+        }
+      } catch (e) {
+        debugPrint('Target exams update by handle error: $e');
+      }
     }
   }
 
@@ -725,6 +764,11 @@ class SupabaseService {
     if (allowedPapers.isNotEmpty && !allowedPapers.contains('All')) {
       final normSet = allowedPapers.map(GateSyllabus.normalizeExam).toSet();
       result = result.where((s) {
+        // ALWAYS preserve user's own authored slips so they never disappear on refresh
+        final isMine = (_currentUserId != null && s.authorId == _currentUserId) ||
+            (_currentUsername != null &&
+                s.authorUsername?.toLowerCase().trim() == _currentUsername!.toLowerCase().trim());
+        if (isMine) return true;
         if (s.examTag == null || s.examTag!.isEmpty) return true;
         // Always preserve General doubts across all paper filters
         if (s.examTag == 'General' || s.topic == 'General') return true;

@@ -372,7 +372,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _ExamPapersSettingsPage(
                     initialExams: userExams,
                     onSave: (updated) {
-                      widget.provider?.refreshStream();
+                      widget.provider?.updateTargetExams(updated);
                       setState(() {});
                     },
                   ),
@@ -2183,6 +2183,11 @@ class _LocalServerSettingsPageState extends State<_LocalServerSettingsPage> {
             number: '4',
             title: 'Instant Local Sync',
             description: 'Blunders logged from your laptop keyboard save immediately onto your phone database. Zero cloud costs, 100% free.',
+          ),
+          _buildInstructionStep(
+            number: '5',
+            title: 'Full Workspace Access',
+            description: 'Browse the live peer feed, search doubts, track your revision cycle, and manage study tasks right on your laptop screen.',
           ),
           const SizedBox(height: 32),
         ],

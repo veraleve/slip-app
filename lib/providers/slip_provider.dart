@@ -21,7 +21,19 @@ class SlipProvider extends ChangeNotifier {
   List<Slip> get slips {
     var result = _slips;
     if (_selectedExamFilter != 'All') {
-      result = result.where((s) => s.examTag == _selectedExamFilter || s.examTag == 'General').toList();
+      final normFilter = GateSyllabus.normalizeExam(_selectedExamFilter);
+      result = result.where((s) =>
+          GateSyllabus.normalizeExam(s.examTag) == normFilter ||
+          s.examTag == 'General' ||
+          s.topic == 'General').toList();
+    } else {
+      // When 'All' is selected, include all slips matching ANY of the user's registered exams
+      final userExamSet = _service.targetExams.map(GateSyllabus.normalizeExam).toSet();
+      result = result.where((s) {
+        if (s.examTag == null || s.examTag!.isEmpty) return true;
+        if (s.examTag == 'General' || s.topic == 'General') return true;
+        return userExamSet.isEmpty || userExamSet.contains(GateSyllabus.normalizeExam(s.examTag));
+      }).toList();
     }
 
     if (_selectedPostTypeFilter != null) {
@@ -104,8 +116,8 @@ class SlipProvider extends ChangeNotifier {
   Future<void> init() async {
     _isLoading = true;
     notifyListeners();
-    // Strictly isolate to the user's registered papers
-    _slips = await _service.fetchStream(userPapers: _service.targetExams);
+    // Allow all papers the user targets (or All if none)
+    _slips = await _service.fetchStream(userPapers: _service.targetExams.isNotEmpty ? _service.targetExams : ['All']);
     await _loadTasks();
     _isLoading = false;
     notifyListeners();
@@ -114,11 +126,25 @@ class SlipProvider extends ChangeNotifier {
   Future<void> refreshStream() async {
     _isLoading = true;
     notifyListeners();
-    final allowedPapers = _selectedExamFilter == 'All' ? ['All'] : [_selectedExamFilter];
+    final allowedPapers = _selectedExamFilter == 'All'
+        ? (_service.targetExams.isNotEmpty ? _service.targetExams : ['All'])
+        : [_selectedExamFilter];
     _slips = await _service.fetchStream(userPapers: allowedPapers);
     _isLoading = false;
     notifyListeners();
   }
+
+  Future<void> updateUserExams(List<String> exams) async {
+    await _service.updateTargetExams(exams);
+    _selectedExamFilter = 'All';
+    _selectedSubjectFilter = 'All';
+    _selectedSubtopicFilter = 'All Topics';
+    _selectedTopicFilter = 'All';
+    await refreshStream();
+    notifyListeners();
+  }
+
+  Future<void> updateTargetExams(List<String> exams) => updateUserExams(exams);
 
   Future<void> loadMoreSlips() async {
     if (_isLoadingMore || _slips.isEmpty) return;
@@ -289,6 +315,15 @@ class SlipProvider extends ChangeNotifier {
     _selectedSubjectFilter = 'All';
     _selectedSubtopicFilter = 'All Topics';
     notifyListeners();
+  }
+
+  Future<void> updateTargetExams(List<String> exams) async {
+    await _service.updateTargetExams(exams);
+    _selectedExamFilter = 'All';
+    _selectedSubjectFilter = 'All';
+    _selectedTopicFilter = 'All';
+    _selectedSubtopicFilter = 'All Topics';
+    await refreshStream();
   }
 
   void setTopicFilter(String topic) {
