@@ -918,7 +918,7 @@ class SupabaseService {
           final localSlips = await loadLocalUserSlips();
           final matching = localSlips.where((s) => s.id == slipId).firstOrNull;
           if (matching != null) {
-            await dropSlip(matching);
+            await submitSlip(matching);
           }
         }
         await _client!.from('slip_comments').insert(comment);
