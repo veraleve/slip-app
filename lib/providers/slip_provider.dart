@@ -317,15 +317,6 @@ class SlipProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateTargetExams(List<String> exams) async {
-    await _service.updateTargetExams(exams);
-    _selectedExamFilter = 'All';
-    _selectedSubjectFilter = 'All';
-    _selectedTopicFilter = 'All';
-    _selectedSubtopicFilter = 'All Topics';
-    await refreshStream();
-  }
-
   void setTopicFilter(String topic) {
     _selectedTopicFilter = topic;
     notifyListeners();
