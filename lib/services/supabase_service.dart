@@ -85,6 +85,29 @@ class SupabaseService {
             if (remoteAgreed) {
               await prefs.setBool('slip_agreed_terms', true);
             }
+          } else {
+            // Profile was created while offline in earlier version!
+            // Auto-upsert profile to cloud database so the user exists in profiles!
+            try {
+              final uid = (_currentUserId != null && isUuid(_currentUserId!))
+                  ? _currentUserId!
+                  : generateUuid();
+              await _client!.from('profiles').upsert({
+                'id': uid,
+                'handle': _currentUsername!,
+                'target_exams': _targetExams,
+                'target_exam': primaryExam,
+                'avatar_glyph': _currentUsername!.isNotEmpty
+                    ? _currentUsername![0].toUpperCase()
+                    : 'P',
+                'password_hash': _savedPassword,
+                'agreed_terms': true,
+                'agreed_terms_version': '1.0',
+                'agreed_terms_at': DateTime.now().toUtc().toIso8601String(),
+              });
+            } catch (e) {
+              debugPrint('Auto-upsert offline profile warning: $e');
+            }
           }
         } catch (e) {
           debugPrint('Profile sync on init warning: $e');
