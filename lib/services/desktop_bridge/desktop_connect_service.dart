@@ -61,7 +61,7 @@ class DesktopConnectService {
 
     _provider = provider;
     _port = port;
-    _sessionToken = 'slip_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(999999)}';
+    _sessionToken = 'slip_${DateTime.now().millisecondsSinceEpoch}_${Random.secure().nextInt(0xFFFFFF).toRadixString(16)}';
     await getDeviceIp();
 
     try {
@@ -136,26 +136,21 @@ class DesktopConnectService {
       final currentPass = service.savedPassword?.trim();
 
       bool isValid = false;
-      if (currentPass != null && currentPass.isNotEmpty) {
-        isValid = (submittedPass == currentPass);
-      } else {
-        // Fallback: check Supabase profile
-        if (service.client != null && service.currentUsername != null) {
+      if (submittedPass.isNotEmpty) {
+        if (currentPass != null && currentPass.isNotEmpty) {
+          isValid = (submittedPass == currentPass);
+        } else if (service.client != null && service.currentUsername != null) {
           final res = await service.client!
               .from('profiles')
               .select('password_hash')
-              .ilike('handle', service.currentUsername!)
+              .eq('handle', service.currentUsername!)
               .limit(1);
           if ((res as List).isNotEmpty) {
             final hash = (res.first['password_hash'] as String? ?? '').trim();
-            if (hash.isEmpty || hash == submittedPass) {
+            if (hash.isNotEmpty && hash == submittedPass) {
               isValid = true;
             }
-          } else {
-            isValid = true;
           }
-        } else {
-          isValid = true;
         }
       }
 
@@ -501,7 +496,7 @@ class DesktopConnectService {
 
       <!-- Screenshot Clipboard Paste Area -->
       <div class="paste-box" id="pasteBox">
-        <p>📋 Click here and press <strong>Ctrl + V</strong> to paste question screenshot</p>
+        <p>Click here and press <strong>Ctrl + V</strong> to paste question screenshot</p>
         <small>Or drag and drop an image file from your laptop</small>
       </div>
 
@@ -672,7 +667,7 @@ class DesktopConnectService {
         const result = await res.json();
         if (res.ok) {
           const toast = document.getElementById('toastMsg');
-          toast.textContent = '✓ ' + (payload.isDoubt ? 'Doubt' : 'Mistake') + ' successfully logged into Slip!';
+          toast.textContent = (payload.isDoubt ? 'Doubt' : 'Mistake') + ' successfully logged into Slip!';
           toast.style.display = 'block';
           setTimeout(() => toast.style.display = 'none', 3500);
 

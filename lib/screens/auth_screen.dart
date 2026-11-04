@@ -140,7 +140,7 @@ class _AuthScreenState extends State<AuthScreen> {
       );
     }
 
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
 
     if (success) {
       await service.setLoggedIn(
@@ -151,11 +151,13 @@ class _AuthScreenState extends State<AuthScreen> {
       );
       widget.onAuthenticated();
     } else {
-      setState(() {
-        _errorMessage = _isSignUp
-            ? 'USERNAME ALREADY REGISTERED. PLEASE SIGN IN.'
-            : 'INVALID USERNAME OR PASSWORD.';
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = _isSignUp
+              ? 'USERNAME ALREADY REGISTERED. PLEASE SIGN IN.'
+              : 'INVALID USERNAME OR PASSWORD.';
+        });
+      }
     }
   }
 
@@ -181,7 +183,7 @@ class _AuthScreenState extends State<AuthScreen> {
       username: username,
       newPassword: password,
     );
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
 
     if (success) {
       await service.setLoggedIn(
@@ -192,7 +194,9 @@ class _AuthScreenState extends State<AuthScreen> {
       );
       widget.onAuthenticated();
     } else {
-      setState(() => _errorMessage = 'COULD NOT RESET PASSWORD FOR USERNAME.');
+      if (mounted) {
+        setState(() => _errorMessage = 'COULD NOT RESET PASSWORD FOR USERNAME.');
+      }
     }
   }
 

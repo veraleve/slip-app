@@ -70,28 +70,30 @@ class SlipProvider extends ChangeNotifier {
   // Counts for profile (accurately reflects user's own doubts & blunders)
   int get sharedCount {
     final uid = _service.currentUserId;
-    final uname = _service.currentUsername;
+    final uname = _service.currentUsername?.toLowerCase().trim();
     return _slips.where((s) {
       final matchesId = uid != null && s.authorId == uid;
-      final matchesName = uname != null && s.authorUsername == uname;
+      final matchesName = uname != null && s.authorUsername?.toLowerCase().trim() == uname;
       return matchesId || matchesName;
     }).length;
   }
 
   int get sharedDoubtsCount {
     final uid = _service.currentUserId;
-    final uname = _service.currentUsername;
+    final uname = _service.currentUsername?.toLowerCase().trim();
     return _slips.where((s) {
-      final isAuthor = (uid != null && s.authorId == uid) || (uname != null && s.authorUsername == uname);
+      final isAuthor = (uid != null && s.authorId == uid) ||
+          (uname != null && s.authorUsername?.toLowerCase().trim() == uname);
       return isAuthor && s.postType == PostType.doubt;
     }).length;
   }
 
   int get sharedMistakesCount {
     final uid = _service.currentUserId;
-    final uname = _service.currentUsername;
+    final uname = _service.currentUsername?.toLowerCase().trim();
     return _slips.where((s) {
-      final isAuthor = (uid != null && s.authorId == uid) || (uname != null && s.authorUsername == uname);
+      final isAuthor = (uid != null && s.authorId == uid) ||
+          (uname != null && s.authorUsername?.toLowerCase().trim() == uname);
       return isAuthor && s.postType == PostType.mistake;
     }).length;
   }
@@ -141,10 +143,15 @@ class SlipProvider extends ChangeNotifier {
   List<String> _customLists = [];
   List<String> get customLists => List.unmodifiable(_customLists);
 
+  String get _scopedCustomListsKey {
+    final user = (_service.currentUsername ?? 'guest').toLowerCase().trim();
+    return 'slip_custom_task_lists_$user';
+  }
+
   // --- TASKS / MOCK TEST REMINDER ENGINE ---
   Future<void> _loadTasks() async {
     final prefs = await SharedPreferences.getInstance();
-    _customLists = prefs.getStringList('slip_custom_task_lists') ?? [];
+    _customLists = prefs.getStringList(_scopedCustomListsKey) ?? prefs.getStringList('slip_custom_task_lists') ?? [];
 
     final raw = await _service.loadTasksRaw();
     if (raw.isNotEmpty) {
@@ -192,7 +199,7 @@ class SlipProvider extends ChangeNotifier {
     if (clean.isEmpty || clean == 'My Tasks' || clean == 'Starred' || _customLists.contains(clean)) return;
     _customLists.add(clean);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('slip_custom_task_lists', _customLists);
+    await prefs.setStringList(_scopedCustomListsKey, _customLists);
     notifyListeners();
   }
 
@@ -204,7 +211,7 @@ class SlipProvider extends ChangeNotifier {
       }
     }
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('slip_custom_task_lists', _customLists);
+    await prefs.setStringList(_scopedCustomListsKey, _customLists);
     await _persistTasks();
     notifyListeners();
   }
@@ -222,7 +229,7 @@ class SlipProvider extends ChangeNotifier {
       }
     }
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('slip_custom_task_lists', _customLists);
+    await prefs.setStringList(_scopedCustomListsKey, _customLists);
     await _persistTasks();
     notifyListeners();
   }

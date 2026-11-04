@@ -151,33 +151,37 @@ class _AudioWaveformStripState extends State<AudioWaveformStrip> {
 
               // Waveform scrubber bars with tap-to-seek
               Expanded(
-                child: GestureDetector(
-                  onTapDown: (details) {
-                    final box = context.findRenderObject() as RenderBox?;
-                    if (box != null) {
-                      final localX = details.localPosition.dx;
-                      final newProgress = (localX / 160.0).clamp(0.0, 1.0);
-                      setState(() => _progress = newProgress);
-                    }
+                child: LayoutBuilder(
+                  builder: (ctx, constraints) {
+                    final barWidth = constraints.maxWidth;
+                    return GestureDetector(
+                      onTapDown: (details) {
+                        if (barWidth > 0) {
+                          final localX = details.localPosition.dx;
+                          final newProgress = (localX / barWidth).clamp(0.0, 1.0);
+                          setState(() => _progress = newProgress);
+                        }
+                      },
+                      child: SizedBox(
+                        height: 18,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: List.generate(_waveformHeights.length, (index) {
+                            final isPlayed = (index / _waveformHeights.length) <= _progress;
+                            return Container(
+                              width: 2.0,
+                              height: _waveformHeights[index],
+                              decoration: BoxDecoration(
+                                color: isPlayed ? SlipTheme.carbon : const Color(0xFFD1D5DB),
+                                borderRadius: BorderRadius.circular(1),
+                              ),
+                            );
+                          }),
+                        ),
+                      ),
+                    );
                   },
-                  child: SizedBox(
-                    height: 18,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: List.generate(_waveformHeights.length, (index) {
-                        final isPlayed = (index / _waveformHeights.length) <= _progress;
-                        return Container(
-                          width: 2.0,
-                          height: _waveformHeights[index],
-                          decoration: BoxDecoration(
-                            color: isPlayed ? SlipTheme.carbon : const Color(0xFFD1D5DB),
-                            borderRadius: BorderRadius.circular(1),
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
                 ),
               ),
               const SizedBox(width: 8),

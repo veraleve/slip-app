@@ -15,6 +15,7 @@ class GateSyllabus {
   static String normalizeExam(String? exam) {
     if (exam == null || exam.isEmpty) return gateCS;
     final clean = exam.replaceAll(RegExp(r'\s*\d{4}$'), '').trim();
+    if (clean.toLowerCase() == 'general') return 'General';
     if (supportedExams.contains(clean)) return clean;
     return gateCS;
   }

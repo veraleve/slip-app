@@ -58,6 +58,8 @@ lib/constants/env_config.dart
 *.key
 *.pem
 secrets.json
+key.properties
+*.keystore
 agent_handoff.md
 *handoff*.md
 

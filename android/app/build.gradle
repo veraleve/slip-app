@@ -48,12 +48,25 @@ android {
         multiDexEnabled true
     }
 
+    def keystoreProperties = new Properties()
+    def keystorePropertiesFile = rootProject.file('key.properties')
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    }
+
     signingConfigs {
         release {
-            keyAlias 'slip'
-            keyPassword 'slip2027gate'
-            storeFile file('slip_release.jks')
-            storePassword 'slip2027gate'
+            if (keystorePropertiesFile.exists()) {
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+            } else if (file('slip_release.jks').exists()) {
+                keyAlias 'slip'
+                keyPassword 'slip2027gate'
+                storeFile file('slip_release.jks')
+                storePassword 'slip2027gate'
+            }
         }
     }
 

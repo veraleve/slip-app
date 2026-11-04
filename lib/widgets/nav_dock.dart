@@ -17,7 +17,7 @@ class NavDock extends StatelessWidget {
       decoration: const BoxDecoration(
         color: SlipTheme.canvas,
         border: Border(
-          top: BorderSide(color: Color(0xFFEEEEEE), width: 0.8),
+          top: BorderSide(color: SlipTheme.hairline, width: 0.8),
         ),
       ),
       child: SafeArea(

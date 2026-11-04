@@ -275,6 +275,15 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   void _showEditPostDialog(Slip slip) {
+    final currentUsername = widget.provider.currentUsername?.toLowerCase().trim() ?? '';
+    final authorUsername = (slip.authorUsername ?? '').toLowerCase().trim();
+    if (authorUsername.isNotEmpty && authorUsername != currentUsername) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You cannot edit another student\'s post.')),
+      );
+      return;
+    }
+
     final trapController = TextEditingController(text: slip.trapStatement);
     final fixController = TextEditingController(text: slip.fixStatement);
     final List<String> currentImages = List.from(slip.imageUris);
@@ -564,11 +573,20 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   void _confirmDeletePost(Slip slip) {
+    final currentUsername = widget.provider.currentUsername?.toLowerCase().trim() ?? '';
+    final authorUsername = (slip.authorUsername ?? '').toLowerCase().trim();
+    if (authorUsername.isNotEmpty && authorUsername != currentUsername) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You cannot delete another student\'s post.')),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: SlipTheme.canvas,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'DELETE BLUNDER POST',
           style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.5),
@@ -586,12 +604,12 @@ class _ProfileScreenState extends State<ProfileScreen>
             onPressed: () async {
               Navigator.of(ctx).pop();
               await widget.provider.deleteSlip(slip.id);
-              setState(() {});
+              if (mounted) setState(() {});
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: SlipTheme.trapRed,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: const Text('DELETE'),
           ),
@@ -625,7 +643,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     final userExams = service.targetExams;
     final currentUserId = service.currentUserId;
 
-    final isOwnProfile = widget.targetUsername == null || widget.targetUsername == currentUsername;
+    final isOwnProfile = widget.targetUsername == null ||
+        widget.targetUsername!.toLowerCase().trim() == currentUsername.toLowerCase().trim();
     final displayUsername = isOwnProfile ? currentUsername : widget.targetUsername!;
     final initial = displayUsername.isNotEmpty ? displayUsername.substring(0, 1).toUpperCase() : 'P';
 
@@ -634,10 +653,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     final authorSlips = allSlips.where((s) {
       if (isOwnProfile) {
         final matchesId = currentUserId != null && s.authorId == currentUserId;
-        final matchesHandle = s.authorUsername != null && s.authorUsername == currentUsername;
+        final matchesHandle = s.authorUsername != null &&
+            s.authorUsername!.toLowerCase().trim() == currentUsername.toLowerCase().trim();
         return matchesId || matchesHandle;
       } else {
-        return s.authorUsername == widget.targetUsername;
+        return s.authorUsername != null &&
+            s.authorUsername!.toLowerCase().trim() == (widget.targetUsername ?? '').toLowerCase().trim();
       }
     }).toList();
 
@@ -988,15 +1009,15 @@ class _ProfileScreenState extends State<ProfileScreen>
 
         Expanded(
           child: _isSharedGridView
-              ? _buildSharedGrid(sharedSlips)
-              : _buildSharedFeed(sharedSlips),
+              ? _buildSharedGrid(sharedSlips, isOwnProfile: isOwnProfile)
+              : _buildSharedFeed(sharedSlips, isOwnProfile: isOwnProfile),
         ),
       ],
     );
   }
 
   // Instagram 3-column media grid
-  Widget _buildSharedGrid(List<Slip> slips) {
+  Widget _buildSharedGrid(List<Slip> slips, {bool isOwnProfile = true}) {
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(2, 4, 2, 100),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -1011,7 +1032,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         final hasImage = slip.imageUris.isNotEmpty;
 
         return GestureDetector(
-          onTap: () => _showPostDetailModal(slip),
+          onTap: () => _showPostDetailModal(slip, isOwnProfile: isOwnProfile),
           child: Container(
             color: SlipTheme.surface,
             child: Stack(
@@ -1099,7 +1120,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   // Full Feed of user's shared slips with pencil edit and trash delete buttons
-  Widget _buildSharedFeed(List<Slip> slips) {
+  Widget _buildSharedFeed(List<Slip> slips, {bool isOwnProfile = true}) {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 100),
       itemCount: slips.length,
@@ -1129,95 +1150,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                         color: SlipTheme.carbon,
                       ),
                     ),
-                    PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert_rounded, size: 18, color: SlipTheme.carbon),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      onSelected: (val) {
-                        if (val == 'edit') {
-                          _showEditPostDialog(slip);
-                        } else if (val == 'delete') {
-                          _confirmDeletePost(slip);
-                        }
-                      },
-                      itemBuilder: (ctx) => [
-                        const PopupMenuItem(
-                          value: 'edit',
-                          child: Row(
-                            children: [
-                              Icon(Icons.edit_outlined, size: 16, color: SlipTheme.carbon),
-                              SizedBox(width: 10),
-                              Text('Edit Post', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete_outline_rounded, size: 16, color: SlipTheme.trapRed),
-                              SizedBox(width: 10),
-                              Text('Delete Post', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: SlipTheme.trapRed)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(color: SlipTheme.hairline, height: 1),
-
-              // Embedded Slip Card Content (Reddit-style full text with provider)
-              SlipCard(
-                index: index,
-                slip: slip,
-                provider: widget.provider,
-                onSameTap: () => widget.provider.toggleSame(slip.id),
-                onFixToggle: () => widget.provider.toggleFixRevealed(slip.id),
-                onKeepTap: () => widget.provider.toggleKeep(slip.id),
-                onSolveTap: () => widget.provider.toggleCleared(slip.id),
-                onPassTap: () {},
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // Tapping a grid item opens a detailed sheet with Edit & Delete options
-  void _showPostDetailModal(Slip slip) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: SlipTheme.canvas,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        slip.topic,
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
-                      ),
+                    if (isOwnProfile)
                       PopupMenuButton<String>(
-                        icon: const Icon(Icons.more_vert_rounded, size: 20, color: SlipTheme.carbon),
+                        icon: const Icon(Icons.more_vert_rounded, size: 18, color: SlipTheme.carbon),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         onSelected: (val) {
-                          Navigator.of(ctx).pop();
                           if (val == 'edit') {
                             _showEditPostDialog(slip);
                           } else if (val == 'delete') {
@@ -1246,7 +1185,95 @@ class _ProfileScreenState extends State<ProfileScreen>
                             ),
                           ),
                         ],
+                      )
+                    else
+                      const SizedBox.shrink(),
+                  ],
+                ),
+              ),
+              const Divider(color: SlipTheme.hairline, height: 1),
+
+              // Embedded Slip Card Content (Reddit-style full text with provider)
+              SlipCard(
+                index: index,
+                slip: slip,
+                provider: widget.provider,
+                onSameTap: () => widget.provider.toggleSame(slip.id),
+                onFixToggle: () => widget.provider.toggleFixRevealed(slip.id),
+                onKeepTap: () => widget.provider.toggleKeep(slip.id),
+                onSolveTap: () => widget.provider.toggleCleared(slip.id),
+                onPassTap: () {},
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Tapping a grid item opens a detailed sheet with Edit & Delete options
+  void _showPostDetailModal(Slip slip, {bool isOwnProfile = true}) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: SlipTheme.canvas,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        slip.topic,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
                       ),
+                      if (isOwnProfile)
+                        PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_vert_rounded, size: 20, color: SlipTheme.carbon),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          onSelected: (val) {
+                            Navigator.of(ctx).pop();
+                            if (val == 'edit') {
+                              _showEditPostDialog(slip);
+                            } else if (val == 'delete') {
+                              _confirmDeletePost(slip);
+                            }
+                          },
+                          itemBuilder: (ctx) => [
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit_outlined, size: 16, color: SlipTheme.carbon),
+                                  SizedBox(width: 10),
+                                  Text('Edit Post', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete_outline_rounded, size: 16, color: SlipTheme.trapRed),
+                                  SizedBox(width: 10),
+                                  Text('Delete Post', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: SlipTheme.trapRed)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        const SizedBox.shrink(),
                     ],
                   ),
                   const Divider(color: SlipTheme.hairline),

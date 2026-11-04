@@ -327,7 +327,7 @@ class _DropSlipScreenState extends State<DropSlipScreen> {
       isPublic: isDoubt ? true : _isPublic,
     );
 
-    setState(() => _isSubmitting = false);
+    if (mounted) setState(() => _isSubmitting = false);
 
     if (success && mounted) {
       NativeDeviceService.showNotification(

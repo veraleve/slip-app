@@ -8,6 +8,7 @@ import '../constants/app_constants.dart';
 import '../constants/gate_syllabus.dart';
 import '../models/profile.dart';
 import '../models/slip.dart';
+import 'desktop_bridge/desktop_connect_service.dart';
 import 'mock_data_service.dart';
 
 class SupabaseService {
@@ -143,7 +144,8 @@ class SupabaseService {
         ? customHandle.trim()
         : 'peer_$randomHex';
     
-    final uid = 'mesh_${DateTime.now().millisecondsSinceEpoch}_$randomHex';
+    // Valid RFC4122 v4 UUID for database uuid column compatibility
+    final uid = generateUuid();
     final resolvedExams = targetExams.isNotEmpty ? targetExams : [GateSyllabus.gateCS];
 
     await _persistSession(handle, uid, resolvedExams);
@@ -163,6 +165,10 @@ class SupabaseService {
     return true;
   }
 
+  static bool isValidHandle(String handle) {
+    return RegExp(r'^[a-zA-Z0-9_]{3,30}$').hasMatch(handle);
+  }
+
   // --- 2. USERNAME & PASSWORD AUTHENTICATION ---
   Future<bool> signInWithUsername({
     required String username,
@@ -170,7 +176,7 @@ class SupabaseService {
   }) async {
     final cleanUsername = username.trim();
     final cleanPassword = password.trim();
-    if (cleanUsername.isEmpty || cleanPassword.isEmpty) return false;
+    if (!isValidHandle(cleanUsername) || cleanPassword.isEmpty) return false;
 
     if (_client != null) {
       try {
@@ -187,11 +193,18 @@ class SupabaseService {
             // Password mismatch
             return false;
           }
-          // If password_hash wasn't set, set it now
+          // Prevent unauthorized takeover of null-password accounts
           if (storedPass == null || storedPass.isEmpty) {
-            try {
-              await _client!.from('profiles').update({'password_hash': cleanPassword}).eq('id', p['id']);
-            } catch (_) {}
+            final isLocalOwner = _savedUsername != null &&
+                _savedUsername!.toLowerCase().trim() == cleanUsername.toLowerCase().trim();
+            if (isLocalOwner) {
+              try {
+                await _client!.from('profiles').update({'password_hash': cleanPassword}).eq('id', p['id']);
+              } catch (_) {}
+            } else {
+              // Deny claim by unauthorized peer
+              return false;
+            }
           }
 
           final pObj = Profile.fromJson(p);
@@ -225,7 +238,7 @@ class SupabaseService {
   }) async {
     final cleanUsername = username.trim();
     final cleanPassword = password.trim();
-    if (cleanUsername.isEmpty || cleanPassword.isEmpty) return false;
+    if (!isValidHandle(cleanUsername) || cleanPassword.length < 6) return false;
 
     final resolvedExams = targetExams.isNotEmpty ? targetExams : [GateSyllabus.gateCS];
     final uid = generateUuid();
@@ -264,14 +277,23 @@ class SupabaseService {
   }) async {
     final cleanUsername = username.trim();
     final cleanPassword = newPassword.trim();
-    if (cleanUsername.isEmpty || cleanPassword.length < 6) return false;
+    if (!isValidHandle(cleanUsername) || cleanPassword.length < 6) return false;
 
     if (_client != null) {
       try {
+        final profileRes = await _client!
+            .from('profiles')
+            .select('id, handle')
+            .ilike('handle', cleanUsername)
+            .limit(1);
+        final list = profileRes as List;
+        if (list.isEmpty) return false;
+        final profileId = list.first['id'] as String;
+
         final res = await _client!
             .from('profiles')
             .update({'password_hash': cleanPassword})
-            .ilike('handle', cleanUsername)
+            .eq('id', profileId)
             .select();
         if ((res as List).isNotEmpty) {
           _savedPassword = cleanPassword;
@@ -299,6 +321,9 @@ class SupabaseService {
   }
 
   Future<void> signOut() async {
+    try {
+      await DesktopConnectService().stopServer();
+    } catch (_) {}
     _currentUsername = null;
     _currentUserId = null;
     _isLoggedIn = false;
@@ -331,8 +356,17 @@ class SupabaseService {
   }
 
   // --- LOCAL-FIRST OFFLINE STORAGE & DELTA SYNC ---
-  String get _scopedUserSlipsKey => 'slip_local_user_slips_${_currentUsername ?? "guest"}';
-  String get _scopedSameIdsKey => 'slip_same_ids_${_currentUsername ?? "guest"}';
+  String _userKey(String baseKey) {
+    final user = (_currentUsername ?? 'guest').toLowerCase().trim();
+    return '${baseKey}_$user';
+  }
+
+  String get _scopedUserSlipsKey => _userKey('slip_local_user_slips');
+  String get _scopedSameIdsKey => _userKey('slip_same_ids');
+  String get _scopedSavedSlipsKey => _userKey('slip_saved_peer_slips');
+  String get _scopedSavedSlipIdsKey => _userKey('slip_saved_slip_ids');
+  String get _scopedDeletedIdsKey => _userKey('slip_deleted_ids');
+  String get _scopedTasksKey => _userKey('slip_local_tasks');
 
   Future<List<Slip>> loadLocalUserSlips() async {
     try {
@@ -347,7 +381,7 @@ class SupabaseService {
   Future<void> saveLocalUserSlips(List<Slip> slips) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final userSlips = slips.where((s) => (s.authorId != null && s.authorId == _currentUserId) || (s.authorUsername != null && s.authorUsername == _currentUsername)).toList();
+      final userSlips = slips.where((s) => (s.authorId != null && s.authorId == _currentUserId) || (s.authorUsername != null && s.authorUsername?.toLowerCase().trim() == _currentUsername?.toLowerCase().trim())).toList();
       final List<String> rawList = userSlips.map((s) => jsonEncode(s.toJson())).toList();
       await prefs.setStringList(_scopedUserSlipsKey, rawList);
     } catch (_) {}
@@ -397,7 +431,7 @@ class SupabaseService {
   Future<List<Slip>> loadSavedPeerSlips() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final rawList = prefs.getStringList('slip_saved_peer_slips') ?? [];
+      final rawList = prefs.getStringList(_scopedSavedSlipsKey) ?? prefs.getStringList('slip_saved_peer_slips') ?? [];
       return rawList.map((str) => Slip.fromJson(jsonDecode(str) as Map<String, dynamic>)).toList();
     } catch (_) {
       return [];
@@ -408,14 +442,14 @@ class SupabaseService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final List<String> rawList = slips.map((s) => jsonEncode(s.toJson())).toList();
-      await prefs.setStringList('slip_saved_peer_slips', rawList);
+      await prefs.setStringList(_scopedSavedSlipsKey, rawList);
     } catch (_) {}
   }
 
   Future<Set<String>> getSavedSlipIds() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final list = prefs.getStringList('slip_saved_slip_ids') ?? [];
+      final list = prefs.getStringList(_scopedSavedSlipIdsKey) ?? prefs.getStringList('slip_saved_slip_ids') ?? [];
       return list.toSet();
     } catch (_) {
       return {};
@@ -425,13 +459,13 @@ class SupabaseService {
   Future<void> setSlipSaved(Slip slip, bool isSaved) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final savedIds = (prefs.getStringList('slip_saved_slip_ids') ?? []).toSet();
+      final savedIds = (prefs.getStringList(_scopedSavedSlipIdsKey) ?? prefs.getStringList('slip_saved_slip_ids') ?? []).toSet();
       if (isSaved) {
         savedIds.add(slip.id);
       } else {
         savedIds.remove(slip.id);
       }
-      await prefs.setStringList('slip_saved_slip_ids', savedIds.toList());
+      await prefs.setStringList(_scopedSavedSlipIdsKey, savedIds.toList());
 
       // Update saved slips cache
       final savedSlips = await loadSavedPeerSlips();
@@ -482,7 +516,7 @@ class SupabaseService {
     final cachedFeed = await loadCachedFeed();
     final savedIds = await getSavedSlipIds();
     final prefs = await SharedPreferences.getInstance();
-    final deletedIds = (prefs.getStringList('slip_deleted_ids') ?? []).toSet();
+    final deletedIds = (prefs.getStringList(_scopedDeletedIdsKey) ?? prefs.getStringList('slip_deleted_ids') ?? []).toSet();
     final sameIds = (prefs.getStringList(_scopedSameIdsKey) ?? []).toSet();
     final commentCounts = await fetchCommentCounts();
 
@@ -681,15 +715,16 @@ class SupabaseService {
           ? slip.authorId!
           : ((_currentUserId != null && isUuid(_currentUserId!)) ? _currentUserId! : generateUuid());
 
-      String? imageUrl;
-      if (slip.imageUris.isNotEmpty) {
-        final firstImg = slip.imageUris.first;
-        if (firstImg.startsWith('http://') || firstImg.startsWith('https://')) {
-          imageUrl = firstImg;
+      final List<String> uploadedImageUris = [];
+      for (final img in slip.imageUris) {
+        if (img.startsWith('http://') || img.startsWith('https://')) {
+          uploadedImageUris.add(img);
         } else {
-          imageUrl = await uploadMediaFile(firstImg, isAudio: false);
+          final up = await uploadMediaFile(img, isAudio: false);
+          uploadedImageUris.add(up ?? img);
         }
       }
+      final String? firstImageUrl = uploadedImageUris.isNotEmpty ? uploadedImageUris.first : null;
 
       String? voiceUrl;
       if (slip.voiceAudioUrl != null && slip.voiceAudioUrl!.isNotEmpty) {
@@ -702,7 +737,7 @@ class SupabaseService {
       }
 
       final resolvedSlip = slip.copyWith(
-        imageUris: imageUrl != null ? [imageUrl] : slip.imageUris,
+        imageUris: uploadedImageUris.isNotEmpty ? uploadedImageUris : slip.imageUris,
         voiceAudioUrl: voiceUrl ?? slip.voiceAudioUrl,
       );
 
@@ -730,7 +765,7 @@ class SupabaseService {
         'is_public': resolvedSlip.isPublic,
         'trap_statement': resolvedSlip.trapStatement.isNotEmpty ? resolvedSlip.trapStatement : '',
         'fix_statement': resolvedSlip.fixStatement.isNotEmpty ? resolvedSlip.fixStatement : '',
-        'scratchpad_image_url': imageUrl ?? (resolvedSlip.imageUris.isNotEmpty ? resolvedSlip.imageUris.first : null),
+        'scratchpad_image_url': firstImageUrl ?? (resolvedSlip.imageUris.isNotEmpty ? resolvedSlip.imageUris.first : null),
         'voice_audio_url': voiceUrl ?? resolvedSlip.voiceAudioUrl,
         'author_id': validAuthorId,
         'author_handle': resolvedSlip.authorUsername ?? _currentUsername ?? 'peer',
@@ -836,9 +871,9 @@ class SupabaseService {
     // 4. Track locally deleted IDs so fresh sync or stale caches never resurrect them
     try {
       final prefs = await SharedPreferences.getInstance();
-      final deleted = (prefs.getStringList('slip_deleted_ids') ?? []).toSet();
+      final deleted = (prefs.getStringList(_scopedDeletedIdsKey) ?? prefs.getStringList('slip_deleted_ids') ?? []).toSet();
       deleted.add(slipId);
-      await prefs.setStringList('slip_deleted_ids', deleted.toList());
+      await prefs.setStringList(_scopedDeletedIdsKey, deleted.toList());
     } catch (_) {}
 
     // 5. Delete permanently from Supabase cloud

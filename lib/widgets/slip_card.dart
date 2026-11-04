@@ -194,7 +194,7 @@ class _SlipCardState extends State<SlipCard> with TickerProviderStateMixin {
                       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                       decoration: BoxDecoration(
                         color: SlipTheme.carbon,
-                        borderRadius: BorderRadius.circular(2),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         isGeneralDoubt ? 'GENERAL' : 'DOUBT',
@@ -213,7 +213,7 @@ class _SlipCardState extends State<SlipCard> with TickerProviderStateMixin {
                         color: slip.isResolved
                             ? SlipTheme.clearedGreen.withOpacity(0.12)
                             : SlipTheme.surface,
-                        borderRadius: BorderRadius.circular(2),
+                        borderRadius: BorderRadius.circular(6),
                         border: Border.all(
                           color: slip.isResolved ? SlipTheme.clearedGreen : SlipTheme.hairline,
                           width: 0.6,
@@ -242,7 +242,7 @@ class _SlipCardState extends State<SlipCard> with TickerProviderStateMixin {
                       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                       decoration: BoxDecoration(
                         color: SlipTheme.surface,
-                        borderRadius: BorderRadius.circular(2),
+                        borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: SlipTheme.hairline, width: 0.6),
                       ),
                       child: const Text(
@@ -261,7 +261,7 @@ class _SlipCardState extends State<SlipCard> with TickerProviderStateMixin {
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
                         decoration: BoxDecoration(
                           color: SlipTheme.hairline,
-                          borderRadius: BorderRadius.circular(2),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
@@ -291,7 +291,7 @@ class _SlipCardState extends State<SlipCard> with TickerProviderStateMixin {
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: SlipTheme.surface,
-                        borderRadius: BorderRadius.circular(2),
+                        borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: SlipTheme.hairline, width: 0.6),
                       ),
                       child: Text(

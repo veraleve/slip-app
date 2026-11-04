@@ -27,7 +27,7 @@ class ImageGalleryGrid extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 10, bottom: 6),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(12),
         child: content,
       ),
     );

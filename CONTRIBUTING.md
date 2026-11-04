@@ -63,6 +63,15 @@ flutter run
 
 ---
 
-## 4. Releasing New Versions
+## 4. Releasing New Versions & Release Governance
 
-Tagging a commit with `v*` (e.g. `git tag v0.1.0 && git push origin v0.1.0`) triggers the automated **GitHub Actions Release Workflow**, which builds `app-release.apk` and publishes it to GitHub Releases.
+* **No Automated Release on PR Merge:** Merging a pull request into `main` validates code quality via automated CI checks (`flutter analyze`, `flutter test`), but does **not** trigger an APK build or release.
+* **PR Batching:** Maintainers batch 2 to 3 merged PRs together per cycle into a coherent version increment before generating an official release.
+* **Owner-Gated Releases:** Production APK builds and GitHub Releases publication are strictly gated and initiated exclusively by the repository owner (`veraleve`) by pushing an annotated release tag:
+  ```bash
+  git tag v0.1.13
+  git push origin v0.1.13
+  ```
+  or by manually triggering the `Release APK` workflow via `workflow_dispatch` in GitHub Actions.
+* **In-App OTA Updates:** Once published, the production APK (`slip.apk`) is automatically detected by Slip's in-app self-updater (`Settings > Check for Updates`), enabling seamless in-place student updates.
+

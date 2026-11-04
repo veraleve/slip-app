@@ -111,6 +111,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> with TickerProvider
       parentId: parentId,
     );
 
+    if (!mounted) return;
     setState(() {
       _isSubmitting = false;
       _replyingToComment = null;
@@ -197,7 +198,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> with TickerProvider
         ],
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),
-          child: Divider(color: Color(0xFFEEEEEE), height: 1),
+          child: Divider(color: SlipTheme.hairline, height: 1),
         ),
       ),
       body: Column(

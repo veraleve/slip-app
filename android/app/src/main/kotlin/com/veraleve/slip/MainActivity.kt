@@ -30,6 +30,7 @@ class MainActivity : FlutterActivity() {
 
     private var pendingPermissionResult: MethodChannel.Result? = null
     private var pendingCameraResult: MethodChannel.Result? = null
+    private var pendingAudioResult: MethodChannel.Result? = null
     private var cameraPhotoFile: File? = null
 
     // Native Audio Engine
@@ -64,8 +65,8 @@ class MainActivity : FlutterActivity() {
                 }
                 "startAudioRecording" -> {
                     if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                        pendingAudioResult = result
                         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), AUDIO_PERMISSION_REQUEST_CODE)
-                        result.success(false)
                     } else {
                         val success = startRecordingAudio()
                         result.success(success)
@@ -235,9 +236,28 @@ class MainActivity : FlutterActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == PERMISSION_REQUEST_CODE) {
-            pendingPermissionResult?.success(checkCurrentPermissions())
-            pendingPermissionResult = null
+        when (requestCode) {
+            PERMISSION_REQUEST_CODE -> {
+                pendingPermissionResult?.success(checkCurrentPermissions())
+                pendingPermissionResult = null
+            }
+            CAMERA_REQUEST_CODE -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    launchCameraIntent()
+                } else {
+                    pendingCameraResult?.success(null)
+                    pendingCameraResult = null
+                }
+            }
+            AUDIO_PERMISSION_REQUEST_CODE -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    val success = startRecordingAudio()
+                    pendingAudioResult?.success(success)
+                } else {
+                    pendingAudioResult?.success(false)
+                }
+                pendingAudioResult = null
+            }
         }
     }
 
@@ -387,13 +407,22 @@ class MainActivity : FlutterActivity() {
             mediaPlayer = MediaPlayer().apply {
                 if (path.startsWith("http://") || path.startsWith("https://")) {
                     setDataSource(path)
+                    setOnPreparedListener { mp ->
+                        mp.start()
+                    }
+                    setOnErrorListener { mp, _, _ ->
+                        mp.release()
+                        mediaPlayer = null
+                        true
+                    }
+                    prepareAsync()
                 } else {
                     val file = File(path)
                     if (!file.exists()) return false
                     setDataSource(file.absolutePath)
+                    prepare()
+                    start()
                 }
-                prepare()
-                start()
                 setOnCompletionListener {
                     it.release()
                     mediaPlayer = null

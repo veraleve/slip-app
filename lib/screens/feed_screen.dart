@@ -65,7 +65,9 @@ class _FeedScreenState extends State<FeedScreen>
     // CRITICAL: Filter from allSlips (not filtered slips) so personal blunders are never hidden
     final allReviewSlips = provider.allSlips.where((s) {
       final isMine = (s.authorId != null && s.authorId == currentUserId) ||
-          (s.authorUsername != null && s.authorUsername == currentUsername);
+          (s.authorUsername != null &&
+              s.authorUsername?.toLowerCase().trim() ==
+                  currentUsername?.toLowerCase().trim());
       final isSaved = s.hasKept;
       return isMine || isSaved;
     }).toList();

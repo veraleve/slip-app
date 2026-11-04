@@ -406,7 +406,7 @@ class _TaskTrapsDrawerState extends State<TaskTrapsDrawer> with SingleTickerProv
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: const Color(0xFFFDE68A), width: 0.8),
                     ),
                     child: Text(
@@ -468,7 +468,7 @@ class _TaskTrapsDrawerState extends State<TaskTrapsDrawer> with SingleTickerProv
               ),
               InkWell(
                 onTap: () => _openSubtopicFilterSheet(context, availableSubtopics),
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(10),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                   child: Row(
@@ -564,7 +564,7 @@ class _TaskTrapsDrawerState extends State<TaskTrapsDrawer> with SingleTickerProv
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: SlipTheme.carbon.withOpacity(0.06),
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     slip.subtopic ?? slip.topic,
